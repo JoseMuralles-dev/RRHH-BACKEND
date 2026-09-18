@@ -1,10 +1,11 @@
+import { RolesModule } from './modules/roles/roles.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
-
+import { EmpleadosModule } from './modules/organization/empleados/empleados.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -23,6 +24,8 @@ import { AuthModule } from './modules/auth/auth.module';
       }),
     }),
     AuthModule,
+    RolesModule,
+    EmpleadosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

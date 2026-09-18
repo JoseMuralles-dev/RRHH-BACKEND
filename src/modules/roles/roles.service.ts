@@ -50,7 +50,7 @@ export class RolesService {
         nivelJerarquico: 'ASC',
       },
     });
-  }cd
+  }
 
   async findOne(idRol: number): Promise<Rol> {
 
