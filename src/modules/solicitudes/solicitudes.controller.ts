@@ -73,6 +73,13 @@ export class SolicitudesController {
       );
   }
 
+    //APROBADAS
+    @Get('aprobadas')
+    findAprobadas(
+      @Req() req: any,
+    ) {
+        return this.solicitudesService.findAprobadas(req.user.idUsuario);
+    }
 
   
   // DETALLE
@@ -80,11 +87,6 @@ export class SolicitudesController {
   @Get('tipos-incidencia')
   findTiposIncidencia() {
     return this.solicitudesService.findTiposIncidencia();
-  }
-
-  @Get('aprobadas')
-  findAprobadas(@Req() req: any) {
-    return this.solicitudesService.findAprobadas(req.user.idUsuario);
   }
 
   @Get(':id')

@@ -11,7 +11,8 @@ import { CreateSolicitudDto } from './dto/create-solicitud.dto';
 import { ResolverAprobacionDto } from './dto/resolver-aprobacion.dto';
 import { EstadoSolicitud } from './enums/estado-solicitud.enum';
 import { EstadoAprobacion } from './enums/estado-aprobacion.enum';
-import { aprobacionDisponible, ESTADOS_ABIERTOS, validarPeriodo } from './solicitud-reglas';
+import { aprobacionDisponible, ESTADOS_ABIERTOS, validarPeriodo,  ESTADOS_APROBADA } from './solicitud-reglas';
+
 
 @Injectable()
 export class SolicitudesService {
@@ -25,8 +26,10 @@ export class SolicitudesService {
   ) {}
 
   async create(idEmpleado: number | null, dto: CreateSolicitudDto) {
-    if (!idEmpleado) throw new BadRequestException('El usuario autenticado no está asociado a un empleado');
-    if (!dto.motivo?.trim()) throw new BadRequestException('Debe indicar el motivo de la solicitud');
+    if (!idEmpleado) 
+        throw new BadRequestException('El usuario autenticado no está asociado a un empleado');
+    if (!dto.motivo?.trim()) 
+        throw new BadRequestException('Debe indicar el motivo de la solicitud');
 
     return this.dataSource.transaction(async manager => {
       const empleado = await manager.getRepository(Empleado).findOne({
@@ -103,15 +106,17 @@ export class SolicitudesService {
 
   async findAprobadas(idUsuario: number) {
     await this.validarAprobador(this.usuarioRepository, idUsuario);
-    return this.aprobacionRepository.find({
-      where: {
-        idUsuarioAprobador: idUsuario, estado: EstadoAprobacion.APROBADA,
-        solicitud: { isActive: true },
-      },
-      relations: { solicitud: { empleado: true, tipoIncidencia: true, aprobaciones: true } },
-      order: { fechaRespuesta: 'DESC', idAprobacion: 'DESC' },
+    const aprobadas = await this.aprobacionRepository.find({ 
+        where: {
+            idUsuarioAprobador: idUsuario, estado: EstadoAprobacion.APROBADA,
+            solicitud: { isActive: true, estado: In(ESTADOS_APROBADA)},
+        },
+         relations: { solicitud: { empleado: true, tipoIncidencia: true, aprobaciones: true } },
+      order: { createdAt: 'ASC' },
     });
-  }
+    return aprobadas.filter(a => a.solicitud.estado === EstadoSolicitud.APROBADA);
+    }
+
 
   async findOne(idSolicitud: number, usuario: { idUsuario: number; idEmpleado?: number | null; nivelJerarquico: number }) {
     const solicitud = await this.solicitudRepository.findOne({
