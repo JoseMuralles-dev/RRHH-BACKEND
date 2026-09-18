@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmpleadosModule } from './modules/organization/empleados/empleados.module';
+import { SolicitudesModule } from './modules/solicitudes/solicitudes.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -26,6 +27,7 @@ import { EmpleadosModule } from './modules/organization/empleados/empleados.modu
     AuthModule,
     RolesModule,
     EmpleadosModule,
+    SolicitudesModule
   ],
   controllers: [AppController],
   providers: [AppService],
