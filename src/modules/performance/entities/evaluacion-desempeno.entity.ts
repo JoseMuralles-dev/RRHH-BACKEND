@@ -1,43 +1,116 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+import { Empleado } from '../../organization/empleados/entities/empleado.entity';
+// Ajusta esta ruta según tu estructura real.
 
 @Entity('evaluaciones_desempeno')
 export class EvaluacionDesempeno {
-  @PrimaryGeneratedColumn({ name: 'id_evaluacion_desempeno', type: 'int' })
+
+  @PrimaryGeneratedColumn({
+    name: 'id_evaluacion_desempeno',
+  })
   idEvaluacionDesempeno!: number;
 
-  @Column({ name: 'id_empleado', type: 'int' })
+  @Column({
+    name: 'id_empleado',
+    type: 'int',
+  })
   idEmpleado!: number;
 
-  @Column({ name: 'id_departamento', type: 'int' })
+  @Column({
+    name: 'id_departamento',
+    type: 'int',
+  })
   idDepartamento!: number;
 
-  @Column({ name: 'periodo_anio', type: 'int' })
+  @Column({
+    name: 'periodo_anio',
+    type: 'int',
+  })
   periodoAnio!: number;
 
-  @Column({ name: 'periodo_mes', type: 'int' })
+  @Column({
+    name: 'periodo_mes',
+    type: 'int',
+  })
   periodoMes!: number;
 
-  @Column({ name: 'puntaje_base', type: 'decimal', precision: 6, scale: 2, default: 0 })
+  @Column({
+    name: 'puntaje_base',
+    type: 'decimal',
+    precision: 6,
+    scale: 2,
+    default: 0,
+  })
   puntajeBase!: string;
 
-  @Column({ name: 'penalizacion_total', type: 'decimal', precision: 6, scale: 2, default: 0 })
+  @Column({
+    name: 'penalizacion_total',
+    type: 'decimal',
+    precision: 6,
+    scale: 2,
+    default: 0,
+  })
   penalizacionTotal!: string;
 
-  @Column({ name: 'nota_final', type: 'decimal', precision: 6, scale: 2, default: 0 })
+  @Column({
+    name: 'nota_final',
+    type: 'decimal',
+    precision: 6,
+    scale: 2,
+    default: 0,
+  })
   notaFinal!: string;
 
-  @Column({ name: 'meta_global', type: 'decimal', precision: 5, scale: 2, nullable: true })
-  metaGlobal!: string | null;
+  @Column({
+    name: 'meta_global',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 100,
+  })
+  metaGlobal!: string;
 
-  @Column({ name: 'estado', type: 'varchar', length: 20, default: "CALCULADA" })
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: 'BORRADOR',
+  })
   estado!: string;
 
-  @Column({ name: 'is_active', type: 'boolean', default: true })
+  @Column({
+    name: 'is_active',
+    type: 'tinyint',
+    default: true,
+  })
   isActive!: boolean;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
+  @CreateDateColumn({
+    name: 'created_at',
+  })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
+  @UpdateDateColumn({
+    name: 'updated_at',
+  })
   updatedAt!: Date;
+
+  @ManyToOne(
+    () => Empleado,
+    {
+      nullable: false,
+    },
+  )
+  @JoinColumn({
+    name: 'id_empleado',
+  })
+  empleado!: Empleado;
 }

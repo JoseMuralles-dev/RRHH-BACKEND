@@ -1,10 +1,14 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
-  PrimaryGeneratedColumn,
-  ManyToOne,
   JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+
+
 
 import { Departamento } from '../../organization/departamentos/entities/departamento.entity';
 
@@ -14,41 +18,41 @@ export class MetricaKpi {
   @PrimaryGeneratedColumn({
     name: 'id_metrica',
   })
-  idMetrica: number | undefined;
+  idMetrica!: number;
 
   @Column({
     name: 'id_departamento',
     type: 'int',
   })
-  idDepartamento: number | undefined;
+  idDepartamento!: number;
 
   @Column({
-    name: 'codigo_kpi',
-    length: 50,
-    type: 'varchar',
-    unique: true,
-  })
-  codigoKpi: string | undefined;
+  name: 'codigo_kpi',
+  type: 'varchar',
+  length: 50,
+  unique: true,
+})
+codigoKpi!: string;
 
   @Column({
     name: 'nombre_kpi',
-    length: 100,
     type: 'varchar',
+    length: 100,
   })
-  nombreKpi: string | undefined;
+  nombreKpi!: string;
 
   @Column({
     type: 'text',
     nullable: true,
   })
-  descripcion?: string | null;
+  descripcion!: string | null;
 
   @Column({
     name: 'unidad_medida',
     type: 'varchar',
     length: 30,
   })
-  unidadMedida: string | undefined;
+  unidadMedida!: string;
 
   @Column({
     name: 'peso_porcentaje',
@@ -57,30 +61,55 @@ export class MetricaKpi {
     scale: 2,
     default: 0,
   })
-  pesoPorcentaje: string | undefined;
+  pesoPorcentaje!: string;
 
   @Column({
-    name: 'meta_objetivo',
-    type: 'decimal',
-    precision: 14,
-    scale: 2,
-    nullable: true,
+    name: 'tipo_calculo',
+    type: 'varchar',
+    length: 20,
   })
-  metaObjetivo!: string | null;
+  tipoCalculo!: string;
 
   @Column({
     name: 'fuente_datos',
     type: 'varchar',
     length: 20,
   })
-  fuenteDatos: string | undefined;
+  fuenteDatos!: string;
+
+  @Column({
+    name: 'origen_datos',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  origenDatos!: string | null;
+
+  @Column({
+    name: 'penalizacion_por_evento',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 0,
+  })
+  penalizacionPorEvento!: string;
 
   @Column({
     name: 'is_active',
-    type: 'boolean',
+    type: 'tinyint',
     default: true,
   })
-  isActive: boolean | undefined;
+  isActive!: boolean;
+
+  @CreateDateColumn({
+    name: 'created_at',
+  })
+  createdAt!: Date;
+
+  @UpdateDateColumn({
+    name: 'updated_at',
+  })
+  updatedAt!: Date;
 
   @ManyToOne(
     () => Departamento,
@@ -91,5 +120,13 @@ export class MetricaKpi {
   @JoinColumn({
     name: 'id_departamento',
   })
-  departamento: Departamento | undefined;
+  departamento!: Departamento;
+  @Column({
+  name: 'meta_objetivo',
+  type: 'decimal',
+  precision: 14,
+  scale: 2,
+  nullable: true,
+})
+metaObjetivo!: string | null;
 }

@@ -11,7 +11,8 @@ import {
 
 import { Empleado } from '../../organization/empleados/entities/empleado.entity';
 import { MetricaKpi } from './metrica-kpi.entity';
-import type { DesgloseOrigen } from '../interfaces/desglose-origen.interface';
+import { DesgloseOrigen } from '../interfaces/desglose-origen.interface';
+
 
 @Entity('metricas_kpi_diarias')
 @Unique(
@@ -23,70 +24,68 @@ export class MetricaKpiDiaria {
   @PrimaryGeneratedColumn({
     name: 'id_registro',
   })
-  idRegistro: number | undefined;
+  idRegistro!: number;
 
   @Column({
     name: 'id_empleado',
     type: 'int',
   })
-  idEmpleado: number | undefined;
+  idEmpleado!: number;
 
   @Column({
     name: 'id_metrica',
     type: 'int',
   })
-  idMetrica: number | undefined;
+  idMetrica!: number;
 
   @Column({
     type: 'date',
   })
-  fecha: string | undefined;
+  fecha!: string;
 
   @Column({
     type: 'decimal',
     precision: 14,
     scale: 2,
   })
-  valor: string | undefined;
-
-  @Column({ name: 'desglose_origen', type: 'json', nullable: true })
-  desgloseOrigen?: DesgloseOrigen[] | null;
+  valor!: string;
 
   @Column({
     type: 'varchar',
     length: 20,
   })
-  fuente: string | undefined;
+  fuente!: string;
+
+ @Column({
+  name: 'desglose_origen',
+  type: 'json',
+  nullable: true,
+})
+desgloseOrigen!: DesgloseOrigen[] | null;
 
   @CreateDateColumn({
     name: 'created_at',
   })
-  createdAt: Date | undefined;
+  createdAt!: Date;
 
   @UpdateDateColumn({
     name: 'updated_at',
   })
-  updatedAt: Date | undefined;
+  updatedAt!: Date;
 
-  @ManyToOne(
-    () => Empleado,
-    {
-      nullable: false,
-    },
-  )
+  @ManyToOne(() => Empleado, {
+    nullable: false,
+  })
   @JoinColumn({
     name: 'id_empleado',
   })
-  empleado: Empleado | undefined;
+  empleado!: Empleado;
 
-  @ManyToOne(
-    () => MetricaKpi,
-    {
-      nullable: false,
-    },
-  )
+  @ManyToOne(() => MetricaKpi, {
+    nullable: false,
+  })
   @JoinColumn({
     name: 'id_metrica',
   })
-  metrica: MetricaKpi | undefined;
+  metrica!: MetricaKpi;
 }

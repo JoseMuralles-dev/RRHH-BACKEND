@@ -3,13 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
 import { SapService } from '../../integrations/sap/sap.service';
-
 import { MetricaKpi } from '../entities/metrica-kpi.entity';
 import { MetricaKpiDiaria } from '../entities/metrica-kpi-diaria.entity';
-
 import { Empleado } from '../../organization/empleados/entities/empleado.entity';
-import { DesgloseOrigen } from '../interfaces/desglose-origen.interface';
-import { crearDesglose, sumarDesglose } from '../utils/desglose-origen';
 
 @Injectable()
 export class PerformanceService {
@@ -60,12 +56,12 @@ export class PerformanceService {
     // =========================================
 
     const metricas =
-      await this.metricaRepository.find({
-        where: {
-          codigoKpi: In(codigosMetricas),
-          isActive: true,
-        },
-      });
+  await this.metricaRepository.find({
+    where: {
+      codigoKpi: In(codigosMetricas),
+      isActive: true,
+    },
+  });
 
     // =========================================
     // 4. CREAR MAPA DE MÉTRICAS
@@ -111,7 +107,7 @@ export class PerformanceService {
         continue;
       }
 
-      // Buscar el empleado local
+      // Buscar el empleado en la base de la APP
       // utilizando OHEM.empID
       const empleado =
         await this.empleadoRepository.findOne({
@@ -143,11 +139,7 @@ export class PerformanceService {
       //    EN MÉTRICAS DEL SISTEMA
       // =========================================
 
-      const desgloseArticulos = crearDesglose(
-        fila.TotalArticulos,
-        fila.TotalArticulosTraslados,
-      );
-      const valores: { codigo: string; valor: number; desglose?: DesgloseOrigen[] }[] = [
+      const valores = [
         {
           codigo: 'BOD_FACTURAS',
           valor: fila.CantidadFacturas,
@@ -158,8 +150,7 @@ export class PerformanceService {
         },
         {
           codigo: 'BOD_ARTICULOS',
-          valor: Number(sumarDesglose(desgloseArticulos)),
-          desglose: desgloseArticulos,
+          valor: fila.TotalArticulos,
         },
         {
           codigo: 'BOD_TIEMPO_PREP',
@@ -192,7 +183,6 @@ export class PerformanceService {
           metrica.idMetrica,
           fecha,
           Number(item.valor),
-          item.desglose,
         );
 
         resultado.registrosProcesados++;
@@ -216,7 +206,6 @@ export class PerformanceService {
     idMetrica: number,
     fecha: string,
     valor: number,
-    desglose?: DesgloseOrigen[],
   ) {
 
     const existente =
@@ -234,7 +223,6 @@ export class PerformanceService {
 
       existente.valor =
         String(valor);
-      existente.desgloseOrigen = desglose ?? null;
 
       existente.fuente =
         'SAP';
@@ -253,7 +241,6 @@ export class PerformanceService {
         idMetrica,
         fecha,
         valor: String(valor),
-        desgloseOrigen: desglose ?? null,
         fuente: 'SAP',
       });
 

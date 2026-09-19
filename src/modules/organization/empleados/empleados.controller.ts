@@ -37,7 +37,7 @@ export class EmpleadosController {
   // ============================================================
 
   @Get()
-  @MinLevel(2)
+  @MinLevel(3)
   findAll() {
     return this.empleadosService.findAll();
   }
@@ -47,7 +47,7 @@ export class EmpleadosController {
   // ============================================================
 
   @Get('select')
-  @MinLevel(2)
+  @MinLevel(3)
   findForSelect() {
     return this.empleadosService.findForSelect();
   }
@@ -57,7 +57,7 @@ export class EmpleadosController {
   // ============================================================
 
   @Get('buscar')
-  @MinLevel(2)
+  @MinLevel(3)
   buscar(@Query('texto') texto: string) {
     return this.empleadosService.buscar(texto);
   }
@@ -67,7 +67,7 @@ export class EmpleadosController {
   // ============================================================
 
   @Get(':id')
-  @MinLevel(2)
+  @MinLevel(3)
   findOne(
     @Param('id', ParseIntPipe)
     id: number,

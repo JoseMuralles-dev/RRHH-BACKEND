@@ -6,7 +6,7 @@ import {
 
 import { PerformanceService } from '../performance/services/performance.service';
 import { ProcesarMetricasBodegaDto } from './../performance/dto/procesar-metricas-bodega.dto';
-
+import { ProcesarEvaluacionMensualDto } from '../performance/dto/procesar-evaluacion-mensual.dto';
 @Controller('performance')
 export class PerformanceController {
 

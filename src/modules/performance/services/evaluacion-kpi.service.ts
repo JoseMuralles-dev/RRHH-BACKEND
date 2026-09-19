@@ -1,6 +1,5 @@
 import {
   Injectable,
-  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,24 +8,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import {
   Between,
-  EntityManager,
-  In,
   Repository,
 } from 'typeorm';
 
 import { MetricaKpiDiaria } from '../entities/metrica-kpi-diaria.entity';
-import { EvaluacionDesempeno } from '../entities/evaluacion-desempeno.entity';
-import { ResultadoKpi } from '../entities/resultado-kpi.entity';
-import { MetricaKpi } from '../entities/metrica-kpi.entity';
-import { RangoKpi } from '../entities/rango-kpi.entity';
+import { EvaluacionDesempeno } from '../../performance/entities/evaluacion-desempeno.entity';
+import { ResultadoKpi } from '../../performance/entities/resultado-kpi.entity';
+import { RangoKpi } from '../../performance/entities/rango-kpi.entity';
 import { Empleado } from '../../organization/empleados/entities/empleado.entity';
 import { Departamento } from '../../organization/departamentos/entities/departamento.entity';
-import { DetalleResultadoKpi } from '../entities/detalle-resultado-kpi.entity';
-import { agruparDesgloseMensual, sumarDesglose } from '../utils/desglose-origen';
 
 @Injectable()
 export class EvaluacionKpiService {
-  private readonly logger = new Logger(EvaluacionKpiService.name);
 
   constructor(
 
@@ -46,65 +39,53 @@ export class EvaluacionKpiService {
     private readonly rangoRepository:
       Repository<RangoKpi>,
 
-    @InjectRepository(Empleado)
-    private readonly empleadoRepository: Repository<Empleado>,
-
   ) {}
 
-  async procesarEvaluacionesDepartamento(
-    idDepartamento: number,
-    anio: number,
-    mes: number,
-  ) {
-    const departamento = await this.empleadoRepository.manager
-      .getRepository(Departamento)
-      .findOne({ where: { idDepartamento, isActive: true } });
-
+  async procesarEvaluacionesDepartamento(idDepartamento: number, anio: number, mes: number) {
+    const manager = this.evaluacionRepository.manager;
+    const departamento = await manager.getRepository(Departamento).findOne({
+      where: { idDepartamento, isActive: true },
+    });
     if (!departamento) {
       throw new NotFoundException('El departamento no existe o está inactivo.');
     }
-
-    const empleados = await this.empleadoRepository.find({
+    const empleados = await manager.getRepository(Empleado).find({
       select: { idEmpleado: true },
       where: { isActive: true, puesto: { idDepartamento } },
       order: { idEmpleado: 'ASC' },
     });
-
-    const evaluaciones: Awaited<ReturnType<
-      EvaluacionKpiService['procesarEvaluacionMensual']
-    >>[] = [];
+    const evaluaciones: Awaited<ReturnType<EvaluacionKpiService['procesarEvaluacionMensual']>>[] = [];
     const empleadosSinDatos: number[] = [];
     const errores: { idEmpleado: number; mensaje: string }[] = [];
-
     for (const empleado of empleados) {
       try {
-        evaluaciones.push(await this.procesarEvaluacionMensual(
-          empleado.idEmpleado, idDepartamento, anio, mes,
-        ));
+        const evaluacion = await manager.transaction(async transaccion => {
+          const servicio = new EvaluacionKpiService(
+            transaccion.getRepository(MetricaKpiDiaria),
+            transaccion.getRepository(EvaluacionDesempeno),
+            transaccion.getRepository(ResultadoKpi),
+            transaccion.getRepository(RangoKpi),
+          );
+          return servicio.procesarEvaluacionMensual(empleado.idEmpleado, idDepartamento, anio, mes);
+        });
+        evaluaciones.push(evaluacion);
       } catch (error) {
         if (error instanceof NotFoundException) {
           empleadosSinDatos.push(empleado.idEmpleado);
         } else {
-          this.logger.error(
+          Logger.error(
             `Error evaluando al empleado ${empleado.idEmpleado}`,
             error instanceof Error ? error.stack : undefined,
+            EvaluacionKpiService.name,
           );
-          errores.push({
-            idEmpleado: empleado.idEmpleado,
-            mensaje: 'No se pudo guardar la evaluación. Consulta el registro del servidor.',
-          });
+          errores.push({ idEmpleado: empleado.idEmpleado, mensaje: 'No se pudo guardar la evaluación.' });
         }
       }
     }
-
     return {
-      idDepartamento,
-      periodo: { anio, mes },
-      empleadosEncontrados: empleados.length,
-      empleadosEvaluados: evaluaciones.length,
-      empleadosSinDatos,
-      errores,
-      evaluaciones,
+      idDepartamento, periodo: { anio, mes },
+      empleadosEncontrados: empleados.length, empleadosEvaluados: evaluaciones.length,
+      empleadosSinDatos, errores, evaluaciones,
     };
   }
 
@@ -114,22 +95,6 @@ export class EvaluacionKpiService {
     anio: number,
     mes: number,
   ) {
-    return this.evaluacionRepository.manager.transaction(manager =>
-      this.calcularEvaluacionMensual(idEmpleado, idDepartamento, anio, mes, manager),
-    );
-  }
-
-  private async calcularEvaluacionMensual(
-    idEmpleado: number,
-    idDepartamento: number,
-    anio: number,
-    mes: number,
-    manager: EntityManager,
-  ) {
-    const metricaDiariaRepository = manager.getRepository(MetricaKpiDiaria);
-    const evaluacionRepository = manager.getRepository(EvaluacionDesempeno);
-    const resultadoRepository = manager.getRepository(ResultadoKpi);
-    const detalleRepository = manager.getRepository(DetalleResultadoKpi);
 
     const fechaInicial =
       `${anio}-${String(mes).padStart(2, '0')}-01`;
@@ -146,7 +111,7 @@ export class EvaluacionKpiService {
      * 1. Obtener métricas diarias
      */
     const registrosDiarios =
-      await metricaDiariaRepository.find({
+      await this.metricaDiariaRepository.find({
         where: {
           idEmpleado,
           metrica: { idDepartamento, isActive: true },
@@ -171,7 +136,7 @@ export class EvaluacionKpiService {
      * 2. Buscar o crear evaluación mensual
      */
     let evaluacion =
-      await evaluacionRepository.findOne({
+      await this.evaluacionRepository.findOne({
         where: {
           idEmpleado,
           idDepartamento,
@@ -184,7 +149,7 @@ export class EvaluacionKpiService {
     if (!evaluacion) {
 
       evaluacion =
-        evaluacionRepository.create({
+        this.evaluacionRepository.create({
           idEmpleado,
           idDepartamento,
 
@@ -203,7 +168,7 @@ export class EvaluacionKpiService {
         });
 
       evaluacion =
-        await evaluacionRepository.save(
+        await this.evaluacionRepository.save(
           evaluacion,
         );
     }
@@ -214,9 +179,8 @@ export class EvaluacionKpiService {
     const grupos = new Map<
       number,
       {
-        metrica: MetricaKpi;
+        metrica: any;
         valores: number[];
-        registros: MetricaKpiDiaria[];
       }
     >();
 
@@ -224,12 +188,6 @@ export class EvaluacionKpiService {
 
       const idMetrica =
         registro.idMetrica;
-
-      if (idMetrica == null || !registro.metrica) {
-        throw new InternalServerErrorException(
-          'Una métrica diaria no tiene identificador o relación de KPI válida.',
-        );
-      }
 
       let grupo =
         grupos.get(idMetrica);
@@ -239,7 +197,6 @@ export class EvaluacionKpiService {
         grupo = {
           metrica: registro.metrica,
           valores: [],
-          registros: [],
         };
 
         grupos.set(
@@ -251,7 +208,6 @@ export class EvaluacionKpiService {
       grupo.valores.push(
         Number(registro.valor),
       );
-      grupo.registros.push(registro);
     }
 
     let puntajeBase = 0;
@@ -268,19 +224,8 @@ export class EvaluacionKpiService {
       const codigoKpi =
         grupo.metrica.codigoKpi;
 
-      if (grupo.metrica.idMetrica == null || !codigoKpi) {
-        throw new InternalServerErrorException(
-          'La métrica no tiene identificador o código KPI válido.',
-        );
-      }
-
-      const requiereDesglose = codigoKpi === 'BOD_ARTICULOS';
-      const desglose = requiereDesglose
-        ? agruparDesgloseMensual(grupo.registros)
-        : null;
-      const valorMensual = desglose
-        ? Number(sumarDesglose(desglose))
-        : this.calcularValorMensual(
+      const valorMensual =
+        this.calcularValorMensual(
           codigoKpi,
           grupo.valores,
         );
@@ -292,7 +237,6 @@ export class EvaluacionKpiService {
         await this.buscarRango(
           grupo.metrica.idMetrica,
           valorMensual,
-          manager,
         );
 
       const porcentajeCumplimiento =
@@ -315,7 +259,7 @@ export class EvaluacionKpiService {
        * 6. Buscar resultado existente
        */
       let resultado =
-        await resultadoRepository.findOne({
+        await this.resultadoRepository.findOne({
           where: {
             idEvaluacionDesempeno:
               evaluacion.idEvaluacionDesempeno,
@@ -330,7 +274,7 @@ export class EvaluacionKpiService {
       if (!resultado) {
 
         resultado =
-          resultadoRepository.create({
+          this.resultadoRepository.create({
             idEvaluacionDesempeno:
               evaluacion.idEvaluacionDesempeno,
 
@@ -385,30 +329,9 @@ export class EvaluacionKpiService {
             : 'No existe rango configurado para el valor obtenido.';
       }
 
-      const resultadoGuardado = await resultadoRepository.save(
+      await this.resultadoRepository.save(
         resultado,
       );
-
-      if (requiereDesglose) {
-        // Reemplazar solo los orígenes administrados por este ETL.
-        // La transacción revierte tanto el resultado como sus detalles si falla.
-        await detalleRepository.delete({
-          idResultado: resultadoGuardado.idResultado,
-          origen: In(['FACTURAS', 'TRASLADOS']),
-        });
-        if (desglose) {
-          await detalleRepository.save(desglose.map(item =>
-            detalleRepository.create({
-              idResultado: resultadoGuardado.idResultado,
-              origen: item.origen,
-              valor: item.valor,
-              descripcion: item.origen === 'FACTURAS'
-                ? 'Artículos provenientes de facturas'
-                : 'Artículos provenientes de traslados',
-            }),
-          ));
-        }
-      }
 
       resultadosProcesados.push({
         codigoKpi,
@@ -421,10 +344,6 @@ export class EvaluacionKpiService {
 
         rangoEncontrado:
           rango !== null,
-        detalleEstado: requiereDesglose
-          ? (desglose ? 'COMPLETO' : 'REQUIERE_REPROCESAR_ETL')
-          : 'NO_APLICA',
-        detalle: desglose ?? [],
       });
     }
 
@@ -446,7 +365,7 @@ export class EvaluacionKpiService {
     evaluacion.estado =
       'CALCULADA';
 
-    await evaluacionRepository.save(
+    await this.evaluacionRepository.save(
       evaluacion,
     );
 
@@ -525,10 +444,9 @@ export class EvaluacionKpiService {
   private async buscarRango(
     idMetrica: number,
     valor: number,
-    manager: EntityManager,
   ): Promise<RangoKpi | null> {
 
-    return manager.getRepository(RangoKpi)
+    return this.rangoRepository
       .createQueryBuilder('rango')
 
       .where(

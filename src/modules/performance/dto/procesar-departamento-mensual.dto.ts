@@ -1,17 +1,7 @@
 import { Type } from 'class-transformer';
-import {
-  IsInt,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsInt, Max, Min } from 'class-validator';
 
-export class ProcesarEvaluacionMensualDto {
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  idEmpleado!: number;
-
+export class ProcesarDepartamentoMensualDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -20,6 +10,7 @@ export class ProcesarEvaluacionMensualDto {
   @Type(() => Number)
   @IsInt()
   @Min(2000)
+  @Max(9999)
   anio!: number;
 
   @Type(() => Number)

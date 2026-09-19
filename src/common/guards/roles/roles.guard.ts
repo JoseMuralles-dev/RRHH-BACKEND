@@ -25,7 +25,7 @@ export class RolesGuard implements CanActivate {
     // Extraemos el usuario que adjuntó el JwtStrategy en Request
     const { user } = context.switchToHttp().getRequest();
 
-    if (!user || user.nivelJerarquico === undefined) {
+    if (!user || typeof user.nivelJerarquico !== 'number' || !Number.isSafeInteger(user.nivelJerarquico)) {
       throw new ForbiddenException('No posee credenciales de rol válidas');
     }
 

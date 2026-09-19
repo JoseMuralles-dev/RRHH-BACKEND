@@ -5,17 +5,7 @@ import {
   Min,
 } from 'class-validator';
 
-export class ProcesarEvaluacionMensualDto {
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  idEmpleado!: number;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  idDepartamento!: number;
+export class ConsultarDashboardKpiDto {
 
   @Type(() => Number)
   @IsInt()
