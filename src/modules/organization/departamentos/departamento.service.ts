@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, QueryFailedError } from 'typeorm';
 
 import { Departamento } from './entities/departamento.entity';
 import { CreateDepartamentoDto } from './dto/create-departamento.dto';
@@ -44,7 +44,7 @@ export class DepartamentosService {
         isActive: true,
       });
 
-    return this.departamentoRepository.save(
+    return this.guardar(
       departamento,
     );
   }
@@ -58,6 +58,7 @@ export class DepartamentosService {
       order: {
         nombreDepartamento: 'ASC',
       },
+      relations: { puestos: true },
     });
   }
 
@@ -93,9 +94,18 @@ export class DepartamentosService {
     const departamento =
       await this.findOne(idDepartamento);
 
+    if (dto.nombreDepartamento !== undefined && dto.nombreDepartamento !== departamento.nombreDepartamento) {
+      const existente = await this.departamentoRepository.findOne({
+        where: { nombreDepartamento: dto.nombreDepartamento },
+      });
+      if (existente && existente.idDepartamento !== idDepartamento) {
+        throw new ConflictException('Ya existe un departamento con ese nombre');
+      }
+    }
+
     Object.assign(departamento, dto);
 
-    return this.departamentoRepository.save(
+    return this.guardar(
       departamento,
     );
   }
@@ -107,10 +117,25 @@ export class DepartamentosService {
     const departamento =
       await this.findOne(idDepartamento);
 
+    if (departamento.puestos?.some(puesto => puesto.isActive)) {
+      throw new ConflictException('El departamento tiene puestos activos. Reasígnalos o desactívalos primero.');
+    }
+
     departamento.isActive = false;
 
     return this.departamentoRepository.save(
       departamento,
     );
+  }
+
+  private async guardar(departamento: Departamento): Promise<Departamento> {
+    try {
+      return await this.departamentoRepository.save(departamento);
+    } catch (error) {
+      if (error instanceof QueryFailedError && error.driverError?.code === 'ER_DUP_ENTRY') {
+        throw new ConflictException('Ya existe un departamento con ese nombre');
+      }
+      throw error;
+    }
   }
 }

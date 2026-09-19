@@ -45,13 +45,13 @@ export class DepartamentosController {
   }
 
   @Get()
-  @MinLevel(2)
+  @MinLevel(3)
   findAll() {
     return this.departamentosService.findAll();
   }
 
   @Get(':id')
-  @MinLevel(2)
+  @MinLevel(3)
   findOne(
     @Param('id', ParseIntPipe) id: number,
   ) {

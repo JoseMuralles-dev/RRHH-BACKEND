@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsNotEmpty,
   IsOptional,
@@ -6,6 +7,8 @@ import {
 } from 'class-validator';
 
 export class CreateDepartamentoDto {
+
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
 
   @IsString({
     message: 'El nombre del departamento debe ser texto',

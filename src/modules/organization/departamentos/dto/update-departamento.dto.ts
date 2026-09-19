@@ -3,4 +3,5 @@ import { CreateDepartamentoDto } from './create-departamento.dto';
 
 export class UpdateDepartamentoDto extends PartialType(
   CreateDepartamentoDto,
+  { skipNullProperties: false },
 ) {}

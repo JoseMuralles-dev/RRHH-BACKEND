@@ -10,6 +10,8 @@ import { SolicitudesModule } from './modules/solicitudes/solicitudes.module';
 import { SapModule } from './modules/integrations/sap/sap.module';
 import { PerformanceModule } from './modules/performance/performance.module';
 import { KpiModule } from './modules/kpi/kpi.module';
+import { DepartamentosModule } from './modules/organization/departamentos/departamentos.module';
+import { PuestosModule } from './modules/organization/puestos/puestos.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -34,6 +36,8 @@ import { KpiModule } from './modules/kpi/kpi.module';
     SapModule,
     PerformanceModule,
     KpiModule,
+    DepartamentosModule,
+    PuestosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
