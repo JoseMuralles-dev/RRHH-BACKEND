@@ -7,6 +7,9 @@ import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmpleadosModule } from './modules/organization/empleados/empleados.module';
 import { SolicitudesModule } from './modules/solicitudes/solicitudes.module';
+import { SapModule } from './modules/integrations/sap/sap.module';
+import { PerformanceModule } from './modules/performance/performance.module';
+import { KpiModule } from './modules/kpi/kpi.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -27,7 +30,10 @@ import { SolicitudesModule } from './modules/solicitudes/solicitudes.module';
     AuthModule,
     RolesModule,
     EmpleadosModule,
-    SolicitudesModule
+    SolicitudesModule,
+    SapModule,
+    PerformanceModule,
+    KpiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
