@@ -6,7 +6,6 @@ import {
 
 import { EvaluacionKpiService } from '../services/evaluacion-kpi.service';
 import { ProcesarEvaluacionMensualDto } from '../dto/procesar-evaluacion-mensual.dto';
-import { ProcesarDepartamentoMensualDto } from '../dto/procesar-departamento-mensual.dto';
 
 @Controller('performance/evaluaciones')
 export class EvaluacionKpiController {
@@ -29,12 +28,5 @@ export class EvaluacionKpiController {
         dto.anio,
         dto.mes,
       );
-  }
-
-  @Post('mensual')
-  procesarDepartamento(@Body() dto: ProcesarDepartamentoMensualDto) {
-    return this.evaluacionKpiService.procesarEvaluacionesDepartamento(
-      dto.idDepartamento, dto.anio, dto.mes,
-    );
   }
 }

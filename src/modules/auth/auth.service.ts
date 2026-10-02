@@ -11,6 +11,25 @@ import { EstadoUsuario } from '../user/estado-usuario.enum';
 @Injectable()
 export class AuthService {
 
+  async perfil(idUsuario: number) {
+    if (!Number.isSafeInteger(idUsuario) || idUsuario <= 0) {
+      throw new UnauthorizedException();
+    }
+    const usuario = await this.usuarioRepo.findOne({
+      where: { idUsuario, isActive: true, estado: EstadoUsuario.ACTIVO },
+      relations: { empleado: true },
+      select: {
+        idUsuario: true, correo: true,
+        empleado: { primerNombre: true, segundoNombre: true, primerApellido: true, segundoApellido: true },
+      },
+    });
+    if (!usuario) throw new UnauthorizedException();
+    const e = usuario.empleado;
+    const nombre = e ? [e.primerNombre, e.segundoNombre, e.primerApellido, e.segundoApellido]
+      .filter(Boolean).join(' ').trim() : '';
+    return { idUsuario: usuario.idUsuario, correo: usuario.correo, nombre: nombre || usuario.correo };
+  }
+
   constructor(
     @InjectRepository(Usuario)
     private readonly usuarioRepo: Repository<Usuario>,

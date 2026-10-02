@@ -108,7 +108,7 @@ export class EvaluacionKpiService {
       ).padStart(2, '0')}`;
 
     /*
-     * 1. Obtener métricas diarias
+     *  Obtener métricas diarias
      */
     const registrosDiarios =
       await this.metricaDiariaRepository.find({
