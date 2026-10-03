@@ -13,10 +13,10 @@ import { KpiModule } from './modules/kpi/kpi.module';
 import { DepartamentosModule } from './modules/organization/departamentos/departamentos.module';
 import { PuestosModule } from './modules/organization/puestos/puestos.module';
 import { VacacionesModule } from './modules/vacaciones/vacaciones.module';
-import {IAModule} from './modules/IA/IA.module';
+import { AiModule } from './modules/ai/ai.module';
 @Module({
   imports: [
-    IAModule,
+    AiModule,
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

@@ -1,10 +1,11 @@
 ﻿import { NotFoundException, ValidationPipe } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
 import { Empleado } from '../../organization/empleados/entities/empleado.entity';
 import { MetricaKpi } from '../../performance/entities/metrica-kpi.entity';
 import { MetricaKpiDiaria } from '../../performance/entities/metrica-kpi-diaria.entity';
 import { ConsultarMetricasEquipoDto } from '../dto/consultar-metricas-equipo.dto';
-import { AiToolsService } from './IA-tools.service';
+import { AiToolsService } from './ai-tools.service';
+import { AiContextService } from './ai-context.service';
 
 describe('AiToolsService', () => {
   const empleados = { findOne: jest.fn(), find: jest.fn() };
@@ -14,6 +15,10 @@ describe('AiToolsService', () => {
     empleados as unknown as Repository<Empleado>,
     diarias as unknown as Repository<MetricaKpiDiaria>,
     metricas as unknown as Repository<MetricaKpi>,
+    new AiContextService(
+      empleados as unknown as Repository<Empleado>,
+      metricas as unknown as Repository<MetricaKpi>,
+    ),
   );
 
   beforeEach(() => jest.resetAllMocks());
@@ -66,12 +71,10 @@ describe('AiToolsService', () => {
     const result = await service.obtenerMetricasEquipo(1, 2024, 2);
     expect(diarias.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          fecha: expect.objectContaining({
-            _type: 'between',
-            _value: ['2024-02-01', '2024-02-29'],
-          }),
-        }),
+        where: {
+          idEmpleado: In([2, 3]),
+          fecha: Between('2024-02-01', '2024-02-29'),
+        },
       }),
     );
     expect(result.empleados[0].metricas[0]).toMatchObject({
