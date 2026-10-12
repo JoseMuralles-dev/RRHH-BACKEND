@@ -14,6 +14,8 @@ import { DepartamentosModule } from './modules/organization/departamentos/depart
 import { PuestosModule } from './modules/organization/puestos/puestos.module';
 import { VacacionesModule } from './modules/vacaciones/vacaciones.module';
 import { AiModule } from './modules/ai/ai.module';
+import { ExpedientesModule } from './modules/expedientes/expedientes.module';
+import {NotificacionesModule,} from './modules/notificaciones/notificaciones.module';
 @Module({
   imports: [
     AiModule,
@@ -30,6 +32,7 @@ import { AiModule } from './modules/ai/ai.module';
         database: config.get<string>('DB_DATABASE'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,
+         
       }),
     }),
     AuthModule,
@@ -42,6 +45,8 @@ import { AiModule } from './modules/ai/ai.module';
     DepartamentosModule,
     PuestosModule,
     VacacionesModule,
+    ExpedientesModule,
+    NotificacionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

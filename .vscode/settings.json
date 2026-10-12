@@ -1,0 +1,15 @@
+{
+  "jest.useJest30": true,
+  "jest.runMode": "on-demand",
+  "jest.virtualFolders": [
+    {
+      "name": "Backend - unitarias y servicios",
+      "jestCommandLine": "npm test -- --runInBand"
+    },
+    {
+      "name": "Backend - integracion HTTP",
+      "jestCommandLine": "npm run test:integration --"
+    }
+  ],
+  "jest.outputConfig": "neutral"
+}

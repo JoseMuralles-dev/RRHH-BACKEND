@@ -17,9 +17,11 @@ async function bootstrap() {
     }),
   );
    app.enableCors({
-    origin: 'http://localhost:4200',
+    origin: ['http://localhost:4200', 'https://5358p146-4200.use.devtunnels.ms',],
+    
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Disposition'],
   });
 
   await app.listen(process.env.PORT ?? 3000);

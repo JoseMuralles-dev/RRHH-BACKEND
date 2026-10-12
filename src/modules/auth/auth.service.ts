@@ -54,7 +54,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    if (usuario.estado !== EstadoUsuario.ACTIVO) {
+    if (usuario.estado !== EstadoUsuario.ACTIVO || !usuario.rol?.isActive) {
       throw new UnauthorizedException('Usuario no autorizado');
     }
 
