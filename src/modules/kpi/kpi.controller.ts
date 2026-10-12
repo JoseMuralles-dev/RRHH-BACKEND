@@ -43,7 +43,6 @@ obtenerDashboardEquipo(
   @Query()
   consulta: ConsultarDashboardKpiDto,
 ) {
-   console.log('USUARIO JWT:', request.user);
   return this.kpiService.obtenerDashboardEquipo(
     request.user.idEmpleado,
     request.user.nivelJerarquico,

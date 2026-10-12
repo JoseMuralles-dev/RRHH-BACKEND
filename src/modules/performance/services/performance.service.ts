@@ -6,6 +6,8 @@ import { SapService } from '../../integrations/sap/sap.service';
 import { MetricaKpi } from '../entities/metrica-kpi.entity';
 import { MetricaKpiDiaria } from '../entities/metrica-kpi-diaria.entity';
 import { Empleado } from '../../organization/empleados/entities/empleado.entity';
+import { crearDesglose, sumarDesglose } from '../utils/desglose-origen';
+import { DesgloseOrigen } from '../interfaces/desglose-origen.interface';
 
 @Injectable()
 export class PerformanceService {
@@ -139,6 +141,7 @@ export class PerformanceService {
       //    EN MÉTRICAS DEL SISTEMA
       // =========================================
 
+      const desgloseArticulos = crearDesglose(fila.TotalArticulos, fila.TotalArticulosTraslados);
       const valores = [
         {
           codigo: 'BOD_FACTURAS',
@@ -150,7 +153,7 @@ export class PerformanceService {
         },
         {
           codigo: 'BOD_ARTICULOS',
-          valor: fila.TotalArticulos,
+          valor: Number(sumarDesglose(desgloseArticulos)),
         },
         {
           codigo: 'BOD_TIEMPO_PREP',
@@ -183,6 +186,7 @@ export class PerformanceService {
           metrica.idMetrica,
           fecha,
           Number(item.valor),
+          item.codigo === 'BOD_ARTICULOS' ? desgloseArticulos : null,
         );
 
         resultado.registrosProcesados++;
@@ -206,6 +210,7 @@ export class PerformanceService {
     idMetrica: number,
     fecha: string,
     valor: number,
+    desgloseOrigen: DesgloseOrigen[] | null,
   ) {
 
     const existente =
@@ -226,6 +231,7 @@ export class PerformanceService {
 
       existente.fuente =
         'SAP';
+      existente.desgloseOrigen = desgloseOrigen;
 
       await this.metricaDiariaRepository.save(
         existente,
@@ -242,6 +248,7 @@ export class PerformanceService {
         fecha,
         valor: String(valor),
         fuente: 'SAP',
+        desgloseOrigen,
       });
 
     await this.metricaDiariaRepository.save(

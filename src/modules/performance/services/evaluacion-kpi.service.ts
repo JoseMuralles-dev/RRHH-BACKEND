@@ -1,3 +1,6 @@
+import { cumplimientoReal } from './cumplimiento-kpi';
+import { agruparDesgloseMensual } from '../utils/desglose-origen';
+import { DetalleResultadoKpi } from '../entities/detalle-resultado-kpi.entity';
 import {
   Injectable,
   Logger,
@@ -17,6 +20,8 @@ import { ResultadoKpi } from '../../performance/entities/resultado-kpi.entity';
 import { RangoKpi } from '../../performance/entities/rango-kpi.entity';
 import { Empleado } from '../../organization/empleados/entities/empleado.entity';
 import { Departamento } from '../../organization/departamentos/entities/departamento.entity';
+import { MetricaKpi } from '../entities/metrica-kpi.entity';
+import { aplicarCincoS, asegurarMetricaCincoS, codigoCincoS } from '../../kpi/cinco-s/cinco-s.integracion';
 
 @Injectable()
 export class EvaluacionKpiService {
@@ -66,7 +71,10 @@ export class EvaluacionKpiService {
             transaccion.getRepository(ResultadoKpi),
             transaccion.getRepository(RangoKpi),
           );
-          return servicio.procesarEvaluacionMensual(empleado.idEmpleado, idDepartamento, anio, mes);
+          await transaccion.getRepository(Departamento).findOne({
+            where: { idDepartamento }, lock: { mode: 'pessimistic_write' },
+          });
+          return servicio.calcularEvaluacionMensual(empleado.idEmpleado, idDepartamento, anio, mes);
         });
         evaluaciones.push(evaluacion);
       } catch (error) {
@@ -90,6 +98,23 @@ export class EvaluacionKpiService {
   }
 
   async procesarEvaluacionMensual(
+    idEmpleado: number, idDepartamento: number, anio: number, mes: number,
+  ) {
+    return this.evaluacionRepository.manager.transaction(async manager => {
+      const departamento = await manager.getRepository(Departamento).findOne({
+        where: { idDepartamento, isActive: true }, lock: { mode: 'pessimistic_write' },
+      });
+      if (!departamento) throw new NotFoundException('El departamento no existe o está inactivo.');
+      const servicio = new EvaluacionKpiService(
+        manager.getRepository(MetricaKpiDiaria), manager.getRepository(EvaluacionDesempeno),
+        manager.getRepository(ResultadoKpi), manager.getRepository(RangoKpi),
+      );
+      return servicio.calcularEvaluacionMensual(idEmpleado, idDepartamento, anio, mes);
+    });
+  }
+
+  /** Uso interno: el llamador debe mantener una transacción y el bloqueo del departamento. */
+  async calcularEvaluacionMensual(
     idEmpleado: number,
     idDepartamento: number,
     anio: number,
@@ -239,12 +264,7 @@ export class EvaluacionKpiService {
           valorMensual,
         );
 
-      const porcentajeCumplimiento =
-        rango
-          ? Number(
-              rango.porcentajeCumplimiento,
-            )
-          : null;
+      const porcentajeCumplimiento = cumplimientoReal(valorMensual, grupo.metrica.metaObjetivo, codigoKpi);
 
       const puntosObtenidos =
         rango
@@ -329,11 +349,26 @@ export class EvaluacionKpiService {
             : 'No existe rango configurado para el valor obtenido.';
       }
 
-      await this.resultadoRepository.save(
+      resultado = await this.resultadoRepository.save(
         resultado,
       );
 
+      let detalleEstado: string | undefined;
+      if (codigoKpi === 'BOD_ARTICULOS') {
+        const desglose = agruparDesgloseMensual(registrosDiarios.filter(r => r.idMetrica === grupo.metrica.idMetrica));
+        const detalles = this.evaluacionRepository.manager.getRepository(DetalleResultadoKpi);
+        await detalles.delete({ idResultado: resultado.idResultado });
+        if (desglose) {
+          await detalles.save(desglose.map(item => detalles.create({
+            idResultado: resultado.idResultado, origen: item.origen,
+            valor: item.valor, descripcion: null,
+          })));
+        }
+        detalleEstado = desglose ? 'COMPLETO' : 'REQUIERE_REPROCESAR_ETL';
+      }
+
       resultadosProcesados.push({
+        detalleEstado,
         codigoKpi,
         valorMensual,
         meta:
@@ -369,6 +404,18 @@ export class EvaluacionKpiService {
       evaluacion,
     );
 
+    const manager = this.evaluacionRepository.manager;
+    const esBodega = registrosDiarios.some(r => r.metrica.codigoKpi.startsWith('BOD_'));
+    const metricaCincoS = esBodega
+      ? await asegurarMetricaCincoS(manager, idDepartamento)
+      : await manager.getRepository(MetricaKpi).findOne({ where: { codigoKpi: codigoCincoS(idDepartamento), isActive: true } });
+    const cincoS = metricaCincoS ? await aplicarCincoS(manager, evaluacion, metricaCincoS, false) : null;
+    if (cincoS?.completo) {
+      resultadosProcesados.push({ codigoKpi: metricaCincoS!.codigoKpi,
+        valorMensual: cincoS.promedio, meta: '100', porcentajeCumplimiento: cincoS.promedio,
+        puntosObtenidos: cincoS.puntosKpi, rangoEncontrado: false });
+    }
+
     /*
      * 8. Respuesta
      */
@@ -384,13 +431,13 @@ export class EvaluacionKpiService {
         mes,
       },
 
-      puntajeBase,
+      puntajeBase: Number(evaluacion.puntajeBase),
 
       penalizacionTotal,
 
-      notaFinal:
-        puntajeBase -
-        penalizacionTotal,
+      notaFinal: Number(evaluacion.notaFinal),
+      estado: evaluacion.estado,
+      cincoS,
 
       resultados:
         resultadosProcesados,

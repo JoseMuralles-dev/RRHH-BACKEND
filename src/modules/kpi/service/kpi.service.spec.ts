@@ -1,4 +1,4 @@
-/*
+
 import { ForbiddenException, ValidationPipe } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { KpiService } from '../../kpi/service/kpi.service';
@@ -61,14 +61,14 @@ describe('Dashboard KPI personal', () => {
     diarias.find.mockResolvedValue([
       { idMetrica: 3, fecha: '2026-08-01', valor: '10.25', updatedAt: new Date('2026-08-02T00:00:00Z') },
     ]);
-    metricas.find.mockResolvedValue([{ idMetrica: 3, codigokpi: 'BOD_ARTICULOS', nombre: 'Artículos' }]);
+    metricas.find.mockResolvedValue([{ idMetrica: 3, codigoKpi: 'BOD_ARTICULOS', nombre: 'Artículos' }]);
     const dashboard = await service.obtenerDashboard(22, 2026, 8);
     expect(dashboard.evaluaciones).toEqual([]);
     expect(dashboard.diasConDatos).toBe(1);
     expect(dashboard.seriesDiarias[0].puntos).toEqual([{ fecha: '2026-08-01', valor: 10.25 }]);
   });
 
-  it('conserva el porcentaje del rango y los valores null de la evaluación guardada', async () => {
+  it('calcula el cumplimiento real y los valores null de la evaluación guardada', async () => {
     evaluaciones.find.mockResolvedValue([{
       idEvaluacionDesempeno: 9, idDepartamento: 3, puntajeBase: '11.25',
       penalizacionTotal: '0', notaFinal: '11.25', metaGlobal: null,
@@ -78,11 +78,11 @@ describe('Dashboard KPI personal', () => {
       valorObtenido: '126', metaAplicada: '231', porcentajeCumplimiento: '75',
       puntosObtenidos: '11.25', observacion: null,
     }]);
-    metricas.find.mockResolvedValue([{ idMetrica: 1, codigokpi: 'BOD_FACTURAS' }]);
+    metricas.find.mockResolvedValue([{ idMetrica: 1, codigoKpi: 'BOD_FACTURAS' }]);
     const dashboard = await service.obtenerDashboard(22, 2026, 8);
     expect(dashboard.evaluaciones[0].metaGlobal).toBeNull();
     expect(dashboard.evaluaciones[0].resultados[0]).toEqual(expect.objectContaining({
-      porcentajeCumplimiento: 75, valorObtenido: 126, detalles: [],
+      porcentajeCumplimiento: 54.55, valorObtenido: 126, detalles: [],
     }));
   });
 
@@ -95,4 +95,3 @@ describe('Dashboard KPI personal', () => {
     await expect(pipe.transform({ anio: '2026', mes: '8', idEmpleado: '99' }, metadata)).rejects.toThrow();
   });
 });
-*/

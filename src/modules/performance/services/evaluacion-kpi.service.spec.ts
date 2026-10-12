@@ -1,3 +1,6 @@
+import { Departamento } from '../../organization/departamentos/entities/departamento.entity';
+import { MetricaKpi } from '../entities/metrica-kpi.entity';
+import { InspeccionCincoS } from '../../kpi/cinco-s/inspeccion-cinco-s.entity';
 import { Logger, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { EvaluacionKpiService } from './evaluacion-kpi.service';
@@ -17,7 +20,7 @@ describe('Evaluación mensual por departamento', () => {
   const diarias = { find: jest.fn() };
   const evaluaciones = {
     findOne: jest.fn(), create: jest.fn(), save: jest.fn(),
-    manager: { transaction: jest.fn() },
+    manager: { transaction: jest.fn(), getRepository: (entity: unknown): any => manager.getRepository(entity) },
   };
   const resultados = { findOne: jest.fn(), create: jest.fn(), save: jest.fn() };
   const detalles = { delete: jest.fn(), create: jest.fn(), save: jest.fn() };
@@ -30,6 +33,10 @@ describe('Evaluación mensual por departamento', () => {
   const rangos = { createQueryBuilder: jest.fn(() => rangoQuery) };
   const manager = {
     getRepository: jest.fn(entity => {
+      if (entity === Departamento) return departamentos;
+      if (entity === Empleado) return empleados;
+      if (entity === MetricaKpi) return { findOne: async () => ({ idMetrica: 99, codigoKpi: 'DEP_5S_2' }) };
+      if (entity === InspeccionCincoS) return { find: async () => [] };
       if (entity === MetricaKpiDiaria) return diarias;
       if (entity === EvaluacionDesempeno) return evaluaciones;
       if (entity === ResultadoKpi) return resultados;
@@ -51,7 +58,6 @@ describe('Evaluación mensual por departamento', () => {
       evaluaciones as unknown as Repository<EvaluacionDesempeno>,
       resultados as unknown as Repository<ResultadoKpi>,
       rangos as unknown as Repository<RangoKpi>,
-      empleados as unknown as Repository<Empleado>,
     );
   });
 
@@ -59,16 +65,16 @@ describe('Evaluación mensual por departamento', () => {
 
   it('selecciona empleados activos del departamento y continúa tras omisiones y errores', async () => {
     empleados.find.mockResolvedValue([1, 2, 3, 4].map(idEmpleado => ({ idEmpleado })));
-    const evaluar = jest.spyOn(service, 'procesarEvaluacionMensual');
+    const evaluar = jest.spyOn(EvaluacionKpiService.prototype, 'calcularEvaluacionMensual');
     const respuesta = (idEmpleado: number) => ({
       idEvaluacion: idEmpleado, idEmpleado, periodo: { anio: 2026, mes: 9 },
-      puntajeBase: 10, penalizacionTotal: 0, notaFinal: 10, resultados: [],
+      puntajeBase: 10, penalizacionTotal: 0, notaFinal: 10, resultados: [], estado: 'CALCULADA', cincoS: null,
     });
     evaluar.mockResolvedValueOnce(respuesta(1))
       .mockRejectedValueOnce(new NotFoundException('Sin métricas'))
       .mockRejectedValueOnce(new Error('Fallo de escritura'))
       .mockResolvedValueOnce(respuesta(4));
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    jest.spyOn(Logger, 'error').mockImplementation(() => undefined);
 
     const resumen = await service.procesarEvaluacionesDepartamento(2, 2026, 9);
     expect(empleados.find).toHaveBeenCalledWith(expect.objectContaining({

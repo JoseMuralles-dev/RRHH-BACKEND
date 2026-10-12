@@ -1,3 +1,4 @@
+import { cumplimientoReal } from '../../performance/services/cumplimiento-kpi';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Repository } from 'typeorm';
@@ -33,7 +34,7 @@ export class KpiService {
       where: { idEmpleado, isActive: true },
     });
     if (!empleado) {
-      throw new ForbiddenException('Tu empleado no existe o está inactivo.');
+      throw new ForbiddenException('el empleado no existe o está inactivo.');
     }
 
     const fechaInicial = `${anio}-${String(mes).padStart(2, '0')}-01`;
@@ -122,7 +123,7 @@ export class KpiService {
               unidadMedida: metrica?.unidadMedida ?? null,
               valorObtenido: Number(r.valorObtenido),
               metaAplicada: numeroNullable(r.metaAplicada),
-              porcentajeCumplimiento: numeroNullable(r.porcentajeCumplimiento),
+              porcentajeCumplimiento: cumplimientoReal(r.valorObtenido, r.metaAplicada, metrica?.codigoKpi),
               puntosObtenidos: Number(r.puntosObtenidos),
               observacion: r.observacion,
               detalles: detalles.filter(d => d.idResultado === r.idResultado)
@@ -133,76 +134,47 @@ export class KpiService {
     };
   }
   async obtenerDashboardEquipo(
-  idEmpleadoEncargado: number | null | undefined,
-  nivel: number | undefined,
-  anio: number,
-  mes: number,
-) {
-
-  if (
-    !Number.isInteger(idEmpleadoEncargado) ||
-    !idEmpleadoEncargado
+    idEmpleadoEncargado: number | null | undefined,
+    nivel: number | undefined,
+    anio: number,
+    mes: number,
   ) {
-    throw new ForbiddenException(
-      'Tu usuario no tiene un empleado asociado.',
-    );
-  }
-
-  if (nivel !== 2 && nivel !== 3 && nivel !== 4) {
-    throw new ForbiddenException(
-      'No tienes permisos para consultar KPI de equipo.',
-    );
-  }
-
-  // Buscar subordinados del encargado
-const subordinados =
-  await this.empleadoRepository.find({
-    where: {
-      jefeDirecto: {
-        idEmpleado: idEmpleadoEncargado,
-      },
-      isActive: true,
-    },
-  });
-
-  const dashboards = await Promise.all(
-    subordinados.map(async empleado => {
-
-      const dashboard =
-        await this.obtenerDashboard(
-          empleado.idEmpleado,
-          anio,
-          mes,
-        );
-
-      return {
+    if (nivel !== 2 && nivel !== 3 && nivel !== 4) {
+      throw new ForbiddenException('No tienes permisos para consultar KPI de equipo.');
+    }
+    const accesoGlobal = nivel === 3 || nivel === 4;
+    if (!accesoGlobal && (!Number.isSafeInteger(idEmpleadoEncargado) || !idEmpleadoEncargado || idEmpleadoEncargado < 1)) {
+      throw new ForbiddenException('Tu usuario no tiene un empleado asociado.');
+    }
+    const empleados = await this.empleadoRepository.find({
+      where: accesoGlobal
+        ? { isActive: true }
+        : { isActive: true, jefeDirecto: { idEmpleado: idEmpleadoEncargado! } },
+      relations: { puesto: { departamento: true } },
+      order: { primerApellido: 'ASC', primerNombre: 'ASC', idEmpleado: 'ASC' },
+    });
+    const dashboards = [] as {
+      empleado: { idEmpleado: number; nombre: string; idDepartamento: number | null; departamento: string | null };
+      dashboard: DashboardKpiResponseDto;
+    }[];
+    // Limitar las consultas simultaneas cuando se consultan todos los departamentos.
+    for (let inicio = 0; inicio < empleados.length; inicio += 5) {
+      dashboards.push(...await Promise.all(empleados.slice(inicio, inicio + 5).map(async empleado => ({
         empleado: {
-          idEmpleado:
-            empleado.idEmpleado,
-
-          nombre:
-            `${empleado.primerNombre} ${empleado.primerApellido}`,
+          idEmpleado: empleado.idEmpleado,
+          nombre: [empleado.primerNombre, empleado.segundoNombre, empleado.primerApellido, empleado.segundoApellido].filter(Boolean).join(' '),
+          idDepartamento: empleado.puesto?.idDepartamento ?? null,
+          departamento: empleado.puesto?.departamento?.nombreDepartamento ?? null,
         },
-
-        dashboard,
-      };
-    }),
-  );
-
-  return {
-    idEncargado:
-      idEmpleadoEncargado,
-
-    periodo: {
-      anio,
-      mes,
-    },
-
-    totalSubordinados:
-      subordinados.length,
-
-    empleados:
-      dashboards,
-  };
-}
+        dashboard: await this.obtenerDashboard(empleado.idEmpleado, anio, mes),
+      }))));
+    }
+    return {
+      idEncargado: idEmpleadoEncargado ?? null,
+      alcance: accesoGlobal ? 'TODOS_DEPARTAMENTOS' as const : 'EQUIPO' as const,
+      periodo: { anio, mes },
+      totalSubordinados: empleados.length,
+      empleados: dashboards,
+    };
+  }
 }
