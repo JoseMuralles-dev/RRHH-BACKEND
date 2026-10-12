@@ -1,3 +1,4 @@
+import { VacacionesModule } from '../vacaciones/vacaciones.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SolicitudesController } from './solicitudes.controller';
@@ -7,9 +8,12 @@ import { TipoIncidencia } from './entities/tipo-incidencia.entity';
 import { AprobacionIncidencia } from './entities/aprobacion-incidencia.entity';
 import { Empleado } from '../organization/empleados/entities/empleado.entity';
 import { Usuario } from '../user/entities/user.entity';
+import {NotificacionesModule,} from '../notificaciones/notificaciones.module';
 
 @Module({
   imports: [
+    VacacionesModule,
+    NotificacionesModule,
     TypeOrmModule.forFeature([
       SolicitudIncidencia,
       TipoIncidencia,

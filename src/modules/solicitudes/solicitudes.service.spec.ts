@@ -1,3 +1,5 @@
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { VacacionesSaldoService } from '../vacaciones/vacaciones-saldo.service';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { SolicitudesService } from './solicitudes.service';
@@ -21,7 +23,7 @@ describe('Solicitudes: flujo de aprobación', () => {
   const aprobacionRepo = { find: jest.fn(), create: jest.fn(), save: jest.fn() };
   const empleados = { findOne: jest.fn() };
   const usuarios = { findOne: jest.fn(), find: jest.fn() };
-  const tipos = { findOne: jest.fn(), find: jest.fn() };
+  const tipos = { findOne: jest.fn(), findOneBy: jest.fn(), find: jest.fn() };
   const manager = { getRepository: jest.fn() };
   const transaction = jest.fn();
   const dto = { idTipoIncidencia: 1, fechaInicio: '2026-09-17', fechaFin: '2026-09-18', diasSolicitados: 2, motivo: ' Asunto personal ' };
@@ -54,10 +56,13 @@ describe('Solicitudes: flujo de aprobación', () => {
       idEmpleado: 20, isActive: true, usuario: { idUsuario: 20, isActive: true, estado: 'ACTIVO', rol: { isActive: true } },
     } });
     tipos.findOne.mockResolvedValue({ idTipoIncidencia: 1, isActive: true, requierePeriodo: true });
+    tipos.findOneBy.mockImplementation(() => tipos.findOne());
     service = new SolicitudesService(solicitudes as unknown as Repository<SolicitudIncidencia>,
       tipos as unknown as Repository<TipoIncidencia>, aprobacionRepo as unknown as Repository<AprobacionIncidencia>,
       empleados as unknown as Repository<Empleado>, usuarios as unknown as Repository<Usuario>,
-      { transaction } as unknown as DataSource);
+      { transaction } as unknown as DataSource,
+      { bloquearEmpleado: jest.fn() } as unknown as VacacionesSaldoService,
+      { crear: jest.fn(), notificarNuevaSolicitud: jest.fn(), notificarSolicitudAprobada: jest.fn(), notificarSolicitudRechazada: jest.fn() } as unknown as NotificacionesService);
   });
 
   it('creates material requests without dates or days', async () => {
@@ -190,14 +195,15 @@ describe('Solicitudes: flujo de aprobación', () => {
     expect(await service.findPendientesAprobacion(30)).toEqual([]);
   });
 
-  it('lists only this users approved decisions, including requests awaiting RRHH', async () => {
-    const approved = { ...aprobaciones[0], estado: A.APROBADA, solicitud: { ...solicitud, estado: S.EN_REVISION } };
-    aprobacionRepo.find.mockResolvedValue([approved]);
+  it('lists this users decisions only when the request is fully approved', async () => {
+    const pending = { ...aprobaciones[0], estado: A.APROBADA, solicitud: { ...solicitud, estado: S.EN_REVISION } };
+    const approved = { ...aprobaciones[0], estado: A.APROBADA, solicitud: { ...solicitud, estado: S.APROBADA } };
+    aprobacionRepo.find.mockResolvedValue([pending, approved]);
     expect(await service.findAprobadas(20)).toEqual([approved]);
     expect(aprobacionRepo.find).toHaveBeenCalledWith({
-      where: { idUsuarioAprobador: 20, estado: A.APROBADA, solicitud: { isActive: true } },
+      where: { idUsuarioAprobador: 20, estado: A.APROBADA, solicitud: { isActive: true, estado: expect.anything() } },
       relations: { solicitud: { empleado: true, tipoIncidencia: true, aprobaciones: true } },
-      order: { fechaRespuesta: 'DESC', idAprobacion: 'DESC' },
+      order: { createdAt: 'ASC' },
     });
   });
 
@@ -246,3 +252,4 @@ describe('Validaciones de fechas y días', () => {
     expect((await validate(dto)).map(e => e.property)).toEqual(expect.arrayContaining(['fechaInicio', 'motivo']));
   });
 });
+ 

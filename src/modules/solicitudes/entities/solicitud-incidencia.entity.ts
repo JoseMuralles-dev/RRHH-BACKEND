@@ -55,14 +55,8 @@ export class SolicitudIncidencia {
 
   @Column({
     name: 'dias_solicitados',
-    type: 'decimal',
+    type: 'int',
     nullable: true,
-    precision: 5,
-    scale: 1,
-    transformer: {
-      to: (value: number | null) => value,
-      from: (value: string | number | null) => value === null ? null : Number(value),
-    },
   })
   diasSolicitados!: number | null;
 

@@ -108,6 +108,11 @@ export class SolicitudesController {
   }
 
 
+  @Patch(':id')
+  editar(@Param('id', ParseIntPipe) id: number, @Req() req: any, @Body() dto: CreateSolicitudDto) {
+    return this.solicitudesService.editar(id, req.user.idUsuario, dto);
+  }
+
   // APROBAR
 
   @Patch(':id/aprobar')
