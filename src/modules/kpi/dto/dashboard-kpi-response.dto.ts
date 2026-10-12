@@ -34,6 +34,7 @@ export class SerieDiariaKpiDto {
 
 export class DashboardKpiResponseDto {
   idEmpleado!: number;
+  empleado?: { nombre: string; departamento: string | null };
   periodo!: { anio: number; mes: number; fechaInicial: string; fechaFinal: string };
   tieneDatos!: boolean;
   ultimaCargaDiaria!: Date | null;

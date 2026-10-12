@@ -30,7 +30,9 @@ export class KpiService {
       throw new ForbiddenException('Tu usuario no tiene un empleado asociado.');
     }
     const empleado = await this.empleadoRepository.findOne({
-      select: { idEmpleado: true },
+      select: { idEmpleado: true, primerNombre: true, segundoNombre: true, primerApellido: true, segundoApellido: true,
+        puesto: { idDepartamento: true, departamento: { nombreDepartamento: true } } },
+      relations: { puesto: { departamento: true } },
       where: { idEmpleado, isActive: true },
     });
     if (!empleado) {
@@ -99,6 +101,10 @@ export class KpiService {
     }
     return {
       idEmpleado,
+      empleado: {
+        nombre: [empleado.primerNombre, empleado.segundoNombre, empleado.primerApellido, empleado.segundoApellido].filter(Boolean).join(' '),
+        departamento: empleado.puesto?.departamento?.nombreDepartamento ?? null,
+      },
       periodo: { anio, mes, fechaInicial, fechaFinal },
       tieneDatos: evaluaciones.length > 0 || diarias.length > 0,
       ultimaCargaDiaria,
