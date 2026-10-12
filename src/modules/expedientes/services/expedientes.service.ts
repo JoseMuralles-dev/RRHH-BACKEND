@@ -1,12 +1,15 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   StreamableFile,
 } from '@nestjs/common';
 
 import { renameSync } from 'fs';
+import { writeFile, unlink } from 'fs/promises';
+import { EditarDocumentoDto } from '../dto/editar-documento.dto';
 import { join } from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -22,6 +25,78 @@ import { CrearExpedienteDto } from '../dto/crear-expediente.dto';
 
 @Injectable()
 export class ExpedientesService {
+  async editarDocumento(id: number, dto: EditarDocumentoDto, idUsuario: number, archivo?: Express.Multer.File) {
+    let rutaNueva: string | undefined;
+    try {
+      return await this.documentoRepository.manager.transaction(async manager => {
+        const repo = manager.getRepository(DocumentoExpediente);
+        const actual = await repo.findOne({ where: { idDocumento: id, isActive: true, expediente: { isActive: true } },
+          relations: { expediente: true, tipoDocumento: true }, lock: { mode: 'pessimistic_write' } });
+        if (!actual) throw new NotFoundException('Documento activo no encontrado');
+        const datos = {
+          fechaDocumento: dto.fechaDocumento ?? actual.fechaDocumento,
+          fechaVencimiento: dto.fechaVencimiento ?? actual.fechaVencimiento,
+          observaciones: dto.observaciones ?? actual.observaciones,
+        };
+        if (actual.tipoDocumento.requiereVencimiento && !datos.fechaVencimiento) {
+          throw new BadRequestException('Este tipo de documento requiere fecha de vencimiento');
+        }
+        if (datos.fechaDocumento && datos.fechaVencimiento && datos.fechaDocumento > datos.fechaVencimiento) {
+          throw new BadRequestException('El vencimiento no puede ser anterior a la fecha del documento');
+        }
+        if (!archivo) {
+          Object.assign(actual, datos);
+          return repo.save(actual);
+        }
+        const buffer = archivo.buffer;
+        const valido = buffer?.length && buffer.length <= 10 * 1024 * 1024 && (
+          (archivo.mimetype === 'application/pdf' && buffer.subarray(0, 5).toString() === '%PDF-') ||
+          (archivo.mimetype === 'image/png' && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+          (archivo.mimetype === 'image/jpeg' && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255));
+        if (!valido) throw new BadRequestException('El archivo debe ser un PDF, JPG o PNG valido de hasta 10 MB');
+        const nombreArchivo = this.documentStorageService.generarNombreArchivo(
+          archivo.mimetype === 'application/pdf' ? 'documento.pdf' : archivo.mimetype === 'image/png' ? 'documento.png' : 'documento.jpg');
+        const ruta = join(this.documentStorageService.obtenerDirectorioEmpleadoTipo(actual.expediente.idEmpleado, actual.tipoDocumento.codigo), nombreArchivo);
+        await writeFile(ruta, buffer, { flag: 'wx' });
+        rutaNueva = ruta;
+        // Reemplazar crea una nueva version: no borra el archivo ni la autoria originales.
+        actual.isActive = false;
+        await repo.save(actual);
+        return repo.save(repo.create({
+          idExpediente: actual.idExpediente, idTipoDocumento: actual.idTipoDocumento,
+          ...datos, nombreOriginal: archivo.originalname, nombreArchivo, rutaArchivo: ruta,
+          mimeType: archivo.mimetype, tamanoBytes: String(buffer.length),
+          estado: 'VIGENTE', idUsuarioCarga: idUsuario, isActive: true,
+        }));
+      });
+    } catch (error) {
+      if (rutaNueva) await unlink(rutaNueva).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async desactivarDocumento(id: number) {
+    const resultado = await this.documentoRepository.update({ idDocumento: id, isActive: true }, { isActive: false });
+    if (!resultado.affected) throw new NotFoundException('Documento activo no encontrado');
+    return { desactivado: true };
+  }
+
+  async autorizarLecturaPropia(idEmpleado: number | undefined, empleadoRuta?: string, expedienteRuta?: string) {
+    if (!Number.isSafeInteger(idEmpleado) || !idEmpleado || idEmpleado < 1) {
+      throw new ForbiddenException('Tu usuario no tiene un empleado asociado');
+    }
+    const empleado = await this.empleadoRepository.findOne({ where: { idEmpleado, isActive: true } });
+    if (!empleado) throw new ForbiddenException('Empleado inexistente o inactivo');
+    if (empleadoRuta !== undefined && Number(empleadoRuta) !== idEmpleado) {
+      throw new ForbiddenException('Solo puedes consultar tu propio expediente');
+    }
+    if (expedienteRuta !== undefined) {
+      const idExpediente = Number(expedienteRuta);
+      if (!Number.isSafeInteger(idExpediente) || idExpediente < 1) throw new ForbiddenException('Expediente no autorizado');
+      const propio = await this.expedienteRepository.findOne({ where: { idExpediente, idEmpleado, isActive: true } });
+      if (!propio) throw new ForbiddenException('Solo puedes consultar tu propio expediente');
+    }
+  }
   async obtenerArchivo(idExpediente: number, idDocumento: number, descargar: boolean): Promise<StreamableFile> {
     const documento = await this.documentoRepository.findOne({
       where: {
