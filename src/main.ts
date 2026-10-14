@@ -24,6 +24,13 @@ async function bootstrap() {
     exposedHeaders: ['Content-Disposition'],
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = Number(process.env.PORT ?? 3000);
+  const host = process.env.HOST?.trim();
+
+  if (host) {
+    await app.listen(port, host);
+  } else {
+    await app.listen(port);
+  }
 }
 bootstrap();
