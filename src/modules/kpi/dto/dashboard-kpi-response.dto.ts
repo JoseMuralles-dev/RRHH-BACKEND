@@ -7,6 +7,8 @@ export class ResultadoDashboardKpiDto {
   valorObtenido!: number;
   metaAplicada!: number | null;
   porcentajeCumplimiento!: number | null;
+  pesoPorcentaje!: number;
+  aportePorcentaje!: number;
   puntosObtenidos!: number;
   observacion!: string | null;
   detalles!: { origen: string; valor: number; descripcion: string | null }[];

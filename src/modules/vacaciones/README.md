@@ -19,7 +19,7 @@ src/modules/vacaciones/
 
 ## Relaciones existentes
 
-No es necesario modificar entidades:
+Las consultas originales reutilizan estas relaciones:
 
 - `SolicitudIncidencia.empleado`: ManyToOne mediante `id_empleado`.
 - `SolicitudIncidencia.tipoIncidencia`: ManyToOne mediante `id_tipo_incidencia`; inversa `TipoIncidencia.solicitudes`.

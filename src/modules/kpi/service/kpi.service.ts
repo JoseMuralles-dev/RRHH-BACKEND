@@ -1,3 +1,4 @@
+import { aporteKpi, pesoKpi } from '../../performance/services/ponderacion-kpi';
 import { cumplimientoReal } from '../../performance/services/cumplimiento-kpi';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -110,14 +111,21 @@ export class KpiService {
       ultimaCargaDiaria,
       diasConDatos: fechas.size,
       seriesDiarias: [...series.values()],
-      evaluaciones: evaluaciones.map(evaluacion => ({
+      evaluaciones: evaluaciones.map(evaluacion => {
+        const propios = resultados.filter(r => r.idEvaluacionDesempeno === evaluacion.idEvaluacionDesempeno);
+        const aporte = (r: ResultadoKpi) => {
+          const m = porMetrica.get(r.idMetrica);
+          return aporteKpi(r.valorObtenido, r.metaAplicada, m?.codigoKpi, m?.pesoPorcentaje);
+        };
+        const porcentajeBase = Math.min(100, propios.reduce((total, r) => total + aporte(r), 0));
+        return ({
         idEvaluacion: evaluacion.idEvaluacionDesempeno,
         idDepartamento: evaluacion.idDepartamento,
         estado: evaluacion.estado,
-        puntajeBase: Number(evaluacion.puntajeBase),
+        puntajeBase: porcentajeBase,
         penalizacionTotal: Number(evaluacion.penalizacionTotal),
-        notaFinal: Number(evaluacion.notaFinal),
-        metaGlobal: numeroNullable(evaluacion.metaGlobal),
+        notaFinal: Math.max(0, porcentajeBase - Number(evaluacion.penalizacionTotal)),
+        metaGlobal: 100,
         calculadaEn: evaluacion.updatedAt,
         resultados: resultados
           .filter(r => r.idEvaluacionDesempeno === evaluacion.idEvaluacionDesempeno)
@@ -130,13 +138,15 @@ export class KpiService {
               valorObtenido: Number(r.valorObtenido),
               metaAplicada: numeroNullable(r.metaAplicada),
               porcentajeCumplimiento: cumplimientoReal(r.valorObtenido, r.metaAplicada, metrica?.codigoKpi),
-              puntosObtenidos: Number(r.puntosObtenidos),
-              observacion: r.observacion,
+              pesoPorcentaje: pesoKpi(metrica?.codigoKpi, metrica?.pesoPorcentaje),
+              aportePorcentaje: aporte(r),
+              puntosObtenidos: aporte(r),
+              observacion: r.observacion === 'No existe rango configurado para el valor obtenido.' ? null : r.observacion,
               detalles: detalles.filter(d => d.idResultado === r.idResultado)
                 .map(d => ({ origen: d.origen, valor: Number(d.valor), descripcion: d.descripcion })),
             };
           }),
-      })),
+      }); }),
     };
   }
   async obtenerDashboardEquipo(

@@ -1,3 +1,4 @@
+import { aporteKpi } from './ponderacion-kpi';
 import { cumplimientoReal } from './cumplimiento-kpi';
 import { agruparDesgloseMensual } from '../utils/desglose-origen';
 import { DetalleResultadoKpi } from '../entities/detalle-resultado-kpi.entity';
@@ -256,22 +257,11 @@ export class EvaluacionKpiService {
         );
 
       /*
-       * 5. Buscar rango
+       * 5. Ponderar el cumplimiento real con el limite de la metrica
        */
-      const rango =
-        await this.buscarRango(
-          grupo.metrica.idMetrica,
-          valorMensual,
-        );
-
       const porcentajeCumplimiento = cumplimientoReal(valorMensual, grupo.metrica.metaObjetivo, codigoKpi);
-
-      const puntosObtenidos =
-        rango
-          ? Number(
-              rango.puntosOtorgados,
-            )
-          : 0;
+      const puntosObtenidos = aporteKpi(valorMensual, grupo.metrica.metaObjetivo, codigoKpi, grupo.metrica.pesoPorcentaje);
+      const observacion = porcentajeCumplimiento === null ? 'Meta o valor no calculable: aporte pendiente.' : null;
 
       puntajeBase += puntosObtenidos;
 
@@ -320,9 +310,7 @@ export class EvaluacionKpiService {
             penalizacionGenerada: '0',
 
             observacion:
-              rango
-                ? null
-                : 'No existe rango configurado para el valor obtenido.',
+              observacion,
 
             isActive: true,
           });
@@ -344,9 +332,7 @@ export class EvaluacionKpiService {
           puntosObtenidos.toFixed(2);
 
         resultado.observacion =
-          rango
-            ? null
-            : 'No existe rango configurado para el valor obtenido.';
+          observacion;
       }
 
       resultado = await this.resultadoRepository.save(
@@ -378,23 +364,24 @@ export class EvaluacionKpiService {
         puntosObtenidos,
 
         rangoEncontrado:
-          rango !== null,
+          false,
       });
     }
 
     /*
      * 7. Actualizar evaluación general
      */
+    evaluacion.metaGlobal = '100';
     evaluacion.puntajeBase =
-      puntajeBase.toFixed(2);
+      Math.min(100, puntajeBase).toFixed(2);
 
     evaluacion.penalizacionTotal =
       penalizacionTotal.toFixed(2);
 
     evaluacion.notaFinal =
       (
-        puntajeBase -
-        penalizacionTotal
+        Math.max(0, Math.min(100, puntajeBase) -
+        penalizacionTotal)
       ).toFixed(2);
 
     evaluacion.estado =

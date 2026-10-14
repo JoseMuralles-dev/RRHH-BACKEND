@@ -80,9 +80,9 @@ describe('Dashboard KPI personal', () => {
     }]);
     metricas.find.mockResolvedValue([{ idMetrica: 1, codigoKpi: 'BOD_FACTURAS' }]);
     const dashboard = await service.obtenerDashboard(22, 2026, 8);
-    expect(dashboard.evaluaciones[0].metaGlobal).toBeNull();
+    expect(dashboard.evaluaciones[0].metaGlobal).toBe(100);
     expect(dashboard.evaluaciones[0].resultados[0]).toEqual(expect.objectContaining({
-      porcentajeCumplimiento: 54.55, valorObtenido: 126, detalles: [],
+      porcentajeCumplimiento: 126 / 231 * 100, valorObtenido: 126, detalles: [],
     }));
   });
 

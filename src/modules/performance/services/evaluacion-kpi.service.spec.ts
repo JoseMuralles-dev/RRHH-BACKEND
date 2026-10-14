@@ -111,9 +111,9 @@ describe('Evaluación mensual por departamento', () => {
     expect(evaluaciones.create).not.toHaveBeenCalled();
     expect(resultados.create).not.toHaveBeenCalled();
     expect(resultados.save).toHaveBeenCalledWith(expect.objectContaining({
-      idResultado: 8, valorObtenido: '30.00', puntosObtenidos: '5.00',
+      idResultado: 8, valorObtenido: '30.00', puntosObtenidos: '4.50',
     }));
-    expect(resumen.notaFinal).toBe(5);
+    expect(resumen.notaFinal).toBe(4.5);
   });
 
   it('no crea evaluaciones cuando no hay métricas en el período', async () => {
