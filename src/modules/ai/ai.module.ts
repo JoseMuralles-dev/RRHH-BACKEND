@@ -10,6 +10,8 @@ import { AuthModule } from '../auth/auth.module';
 import { Empleado } from '../organization/empleados/entities/empleado.entity';
 import { MetricaKpi } from '../performance/entities/metrica-kpi.entity';
 import { MetricaKpiDiaria } from '../performance/entities/metrica-kpi-diaria.entity';
+import { AiController } from './controllers/ai.controller';
+import { AiService } from './services/ai.service';
 
 @Module({
   imports: [
@@ -17,9 +19,9 @@ import { MetricaKpiDiaria } from '../performance/entities/metrica-kpi-diaria.ent
     TypeOrmModule.forFeature([Empleado, MetricaKpi, MetricaKpiDiaria]),
   ],
 
-  controllers: [AiToolsController, AiToolsLegacyController],
+  controllers: [AiToolsController, AiToolsLegacyController, AiController],
 
-  providers: [AiToolsService, AiContextService],
+  providers: [AiToolsService, AiContextService, AiService],
 
   exports: [AiToolsService],
 })
