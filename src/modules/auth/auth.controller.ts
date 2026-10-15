@@ -7,6 +7,12 @@ import { LoginDto } from './dto/login.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Get('mi-perfil')
+  @UseGuards(JwtAuthGuard)
+  perfilPersonal(@Req() request: { user: { idUsuario: number } }) {
+    return this.authService.perfilPersonal(request.user.idUsuario);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   perfil(@Req() request: { user: { idUsuario: number } }) {
