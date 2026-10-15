@@ -49,11 +49,11 @@ export class ExpedientesService {
           return repo.save(actual);
         }
         const buffer = archivo.buffer;
-        const valido = buffer?.length && buffer.length <= 10 * 1024 * 1024 && (
+        const valido = buffer?.length && buffer.length <= 100 * 1024 * 1024 && (
           (archivo.mimetype === 'application/pdf' && buffer.subarray(0, 5).toString() === '%PDF-') ||
           (archivo.mimetype === 'image/png' && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
           (archivo.mimetype === 'image/jpeg' && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255));
-        if (!valido) throw new BadRequestException('El archivo debe ser un PDF, JPG o PNG valido de hasta 10 MB');
+        if (!valido) throw new BadRequestException('El archivo debe ser un PDF, JPG o PNG valido de hasta 100 MB');
         const nombreArchivo = this.documentStorageService.generarNombreArchivo(
           archivo.mimetype === 'application/pdf' ? 'documento.pdf' : archivo.mimetype === 'image/png' ? 'documento.png' : 'documento.jpg');
         const ruta = join(this.documentStorageService.obtenerDirectorioEmpleadoTipo(actual.expediente.idEmpleado, actual.tipoDocumento.codigo), nombreArchivo);

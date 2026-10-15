@@ -43,7 +43,7 @@ if (!existsSync(tempPath)) {
 export class ExpedientesController {
   @Patch('documentos/:idDocumento')
   @UseInterceptors(FileInterceptor('archivo', {
-    storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    storage: memoryStorage(), limits: { fileSize: 100 * 1024 * 1024, files: 1 },
     fileFilter: (_req, file, callback) => {
       if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimetype)) {
         return callback(new BadRequestException('Solo se permiten archivos PDF, JPG y PNG'), false);
@@ -139,7 +139,7 @@ export class ExpedientesController {
     }),
 
     limits: {
-      fileSize: 10 * 1024 * 1024,
+      fileSize: 100 * 1024 * 1024,
     },
 
     fileFilter: (

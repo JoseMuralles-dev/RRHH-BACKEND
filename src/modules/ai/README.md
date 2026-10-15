@@ -112,3 +112,29 @@ Fechas en formato YYYY-MM-DD, incluyendo el ultimo dia del mes. Un equipo vacio 
 
 Errores: 400 parametros invalidos, 401 token ausente o vencido, 403 nivel insuficiente, 404 encargado inexistente o inactivo.
 
+
+
+## Autenticacion interna de n8n
+
+Los cinco POST /ai-tools/* aceptan JWT como antes, o ambos encabezados:
+
+- X-Internal-Token: mismo secreto N8N_INTERNAL_TOKEN configurado en el backend.
+- X-Actor-Id: usuarios.id_usuario del usuario autenticado que inicio la consulta.
+
+En n8n fija X-Actor-Id desde el body.usuario.idUsuario recibido del webhook
+(enviado por AiService). No lo obtengas del texto del usuario ni de argumentos
+que el modelo pueda cambiar. Valida primero el token del webhook y conserva
+este actor en todas las herramientas. Guarda el secreto en credenciales de n8n;
+no lo pongas en el frontend ni en el prompt del modelo.
+
+El backend consulta el usuario activo y su rol activo en la base de datos.
+Conserva RolesGuard y AiContextService: empleado solo sus datos, encargado
+solo su equipo, RRHH y administrador con su alcance existente. idEncargado
+e idEmpleado del JSON son IDs de empleados; X-Actor-Id es un ID de usuario.
+Un token/actor invalido devuelve 401; consultar fuera del alcance devuelve 403.
+Si falta N8N_INTERNAL_TOKEN, la autenticacion interna queda denegada.
+Los endpoints /ai y las herramientas GET antiguas mantienen su autenticacion JWT.
+
+Despliegue: configurar el mismo secreto en backend y n8n, compilar y reiniciar
+el backend; despues probar HTTP externo con un actor autorizado y otro fuera
+de alcance antes de publicar el flujo. No requiere cambios de base de datos.
