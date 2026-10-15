@@ -7,7 +7,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../common/guards/jwt/jwt-auth.guard';
+import { AiToolsAuthGuard } from '../guards/ai-tools-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles/roles.guard';
 import { MinLevel } from '../../../common/decorators/min-level/min-level.decorator';
 import {
@@ -21,7 +21,7 @@ import type { UsuarioAnalitico } from '../interfaces/ai-context.interface';
 import { AiToolsService } from '../services/ai-tools.service';
 
 @Controller('ai-tools')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(AiToolsAuthGuard, RolesGuard)
 @MinLevel(1)
 export class AiToolsController {
   constructor(private readonly tools: AiToolsService) {}

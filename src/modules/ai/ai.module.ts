@@ -1,3 +1,6 @@
+import { ConfigModule } from '@nestjs/config';
+import { Usuario } from '../user/entities/user.entity';
+import { AiToolsAuthGuard } from './guards/ai-tools-auth.guard';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -16,12 +19,13 @@ import { AiService } from './services/ai.service';
 @Module({
   imports: [
     AuthModule,
-    TypeOrmModule.forFeature([Empleado, MetricaKpi, MetricaKpiDiaria]),
+    ConfigModule,
+    TypeOrmModule.forFeature([Usuario, Empleado, MetricaKpi, MetricaKpiDiaria]),
   ],
 
   controllers: [AiToolsController, AiToolsLegacyController, AiController],
 
-  providers: [AiToolsService, AiContextService, AiService],
+  providers: [AiToolsAuthGuard, AiToolsService, AiContextService, AiService],
 
   exports: [AiToolsService],
 })

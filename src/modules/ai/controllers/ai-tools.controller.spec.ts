@@ -1,3 +1,4 @@
+import { Usuario } from '../../user/entities/user.entity';
 import { ValidationPipe } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -19,6 +20,7 @@ import { AiToolsLegacyController } from './ai-tools-legacy.controller';
 describe('HTTP tools con JWT y RBAC reales (repositorios simulados)', () => {
   let app: INestApplication;
   let jwt: JwtService;
+  const usuarios = { findOne: jest.fn() };
   const empleados = { findOne: jest.fn(), find: jest.fn() };
   const metricas = { find: jest.fn(), findOne: jest.fn() };
   const qb = {
@@ -51,6 +53,7 @@ describe('HTTP tools con JWT y RBAC reales (repositorios simulados)', () => {
       ],
       controllers: [AiToolsController, AiToolsLegacyController],
       providers: [
+        { provide: getRepositoryToken(Usuario), useValue: usuarios },
         AiToolsService,
         AiContextService,
         JwtStrategy,
@@ -77,6 +80,7 @@ describe('HTTP tools con JWT y RBAC reales (repositorios simulados)', () => {
   });
   beforeEach(() => {
     jest.clearAllMocks();
+    usuarios.findOne.mockResolvedValue({ idUsuario: 7, idEmpleado: 10, isActive: true, estado: 'ACTIVO', rol: { isActive: true, nivelJerarquico: 2 } });
     empleados.findOne.mockResolvedValue({
       idEmpleado: 21,
       puesto: { idDepartamento: 3 },
@@ -256,5 +260,42 @@ describe('HTTP tools con JWT y RBAC reales (repositorios simulados)', () => {
       .get('/ia/tools/metricas-equipo?idEncargado=10&anio=2026&mes=9')
       .auth(token(2, 10), { type: 'bearer' })
       .expect(403);
+  });
+
+  it.each(rutas)('internal authentication allows authorized tool %s', async (ruta, body) => {
+    await request(app.getHttpServer() as Server).post('/ai-tools/' + ruta)
+      .set('X-Internal-Token', 'solo-pruebas-ia').set('X-Actor-Id', '7')
+      .send({ ...body, anio: 2026, mes: 9 }).expect(200);
+  });
+
+  it.each([
+    ['incorrect', '7'], ['solo-pruebas-ia', '0'], ['solo-pruebas-ia', '7abc'],
+    ['solo-pruebas-ia', '7,8'], ['', '7'], ['solo-pruebas-ia', ''],
+  ])('rejects invalid internal credentials', async (internal, actor) => {
+    await request(app.getHttpServer() as Server).post('/ai-tools/resumen-equipo')
+      .set('X-Internal-Token', internal).set('X-Actor-Id', actor)
+      .send({ idEncargado: 10, anio: 2026, mes: 9 }).expect(401);
+    expect(usuarios.findOne).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown actor', async () => {
+    usuarios.findOne.mockResolvedValue(null);
+    await request(app.getHttpServer() as Server).post('/ai-tools/resumen-equipo')
+      .set('X-Internal-Token', 'solo-pruebas-ia').set('X-Actor-Id', '7')
+      .send({ idEncargado: 10, anio: 2026, mes: 9 }).expect(401);
+  });
+
+  it('keeps team scope restrictions for internal calls', async () => {
+    await request(app.getHttpServer() as Server).post('/ai-tools/resumen-equipo')
+      .set('X-Internal-Token', 'solo-pruebas-ia').set('X-Actor-Id', '7')
+      .send({ idEncargado: 99, anio: 2026, mes: 9 }).expect(403);
+  });
+
+  it('keeps employee permissions for internal calls', async () => {
+    usuarios.findOne.mockResolvedValue({ idUsuario: 7, idEmpleado: 21, isActive: true,
+      estado: 'ACTIVO', rol: { isActive: true, nivelJerarquico: 1 } });
+    await request(app.getHttpServer() as Server).post('/ai-tools/metricas-empleado')
+      .set('X-Internal-Token', 'solo-pruebas-ia').set('X-Actor-Id', '7')
+      .send({ idEmpleado: 22, anio: 2026, mes: 9 }).expect(403);
   });
 });
