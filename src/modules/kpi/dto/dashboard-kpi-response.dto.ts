@@ -4,7 +4,8 @@ export class ResultadoDashboardKpiDto {
   codigo!: string | null;
   nombre!: string | null;
   unidadMedida!: string | null;
-  valorObtenido!: number;
+  valorObtenido!: number | null;
+  asignacionProvisional?: boolean;
   metaAplicada!: number | null;
   porcentajeCumplimiento!: number | null;
   pesoPorcentaje!: number;
@@ -15,6 +16,7 @@ export class ResultadoDashboardKpiDto {
 }
 
 export class EvaluacionDashboardKpiDto {
+  tiempoProvisional?: boolean;
   idEvaluacion!: number;
   idDepartamento!: number;
   estado!: string;

@@ -47,6 +47,16 @@ describe('UsuariosService', () => {
     expect(repo.find.mock.calls[0][0].where).toBeUndefined();
   });
 
+  it('carga el nombre del empleado asociado sin solicitar datos sensibles', async () => {
+    const usuarios = [{ idUsuario: 1, empleado: { idEmpleado: 8, primerNombre: 'Ana', primerApellido: 'Perez' } }, { idUsuario: 2, empleado: null }];
+    repo.find.mockResolvedValue(usuarios);
+    expect(await service.findAll()).toEqual(usuarios);
+    const opciones = repo.find.mock.calls[0][0];
+    expect(opciones.relations).toEqual({ empleado: true });
+    expect(opciones.select.empleado).toEqual({ idEmpleado: true, primerNombre: true, segundoNombre: true, primerApellido: true, segundoApellido: true });
+    expect(opciones.select.passwordHash).toBeUndefined();
+  });
+
   it.each([false, true])('accepts JSON boolean %s with implicit conversion enabled', async (isActive) => {
     const dto = plainToInstance(UpdateUsuarioDto, { isActive }, { enableImplicitConversion: true });
     expect(await validate(dto)).toEqual([]);

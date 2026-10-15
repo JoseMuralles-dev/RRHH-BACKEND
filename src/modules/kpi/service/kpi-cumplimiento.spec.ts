@@ -13,7 +13,7 @@ it('calcula el porcentaje histórico con la meta aplicada, ponderando la nota si
     return [];
   }}));
   const service = new KpiService({ findOne: async () => ({ idEmpleado: 10 }), manager: { getRepository } } as unknown as Repository<Empleado>);
-  const result = await service.obtenerDashboard(10, 2026, 9);
+  const result = await service.obtenerDashboard(10, 2026, 7);
   expect(result.evaluaciones[0].resultados[0].porcentajeCumplimiento).toBe(126 / 231 * 100);
   expect(result.evaluaciones[0].notaFinal).toBeCloseTo(126 / 231 * 15, 12);
   expect(save).not.toHaveBeenCalled();

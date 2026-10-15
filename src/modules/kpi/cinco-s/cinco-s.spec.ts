@@ -14,6 +14,10 @@ import { validate } from 'class-validator';
 import { EvaluacionKpiService } from '../../performance/services/evaluacion-kpi.service';
 
 describe('Reglas 5S', () => {
+  it('cuatro inspecciones perfectas aportan exactamente 20%', () => {
+    expect(resumenCincoS(Array(4).fill({ puntos: Array(20).fill(5) })))
+      .toMatchObject({ completo: true, promedio: 100, puntosKpi: 20, inspeccionesRequeridas: 4 });
+  });
   it.each([0, 5])('admite extremos %s sin confundir cero y vacío', punto => {
     expect(calcularInspeccion(Array(20).fill(punto))).toEqual({ categorias: Array(5).fill(punto * 4), total: punto * 20 });
   });
@@ -23,16 +27,16 @@ describe('Reglas 5S', () => {
   it('calcula 91 y 94 como 92.5 y 18.5, sin rangos ni redondeos', () => {
     const a = [...Array(18).fill(5), 1, 0];
     const b = [...Array(18).fill(5), 4, 0];
-    expect(resumenCincoS([{ puntos: a }, { puntos: b }])).toMatchObject({ completo: true, promedio: 92.5, puntosKpi: 18.5 });
+    expect(resumenCincoS([{ puntos: a }, { puntos: b }, { puntos: a }, { puntos: b }])).toMatchObject({ completo: true, promedio: 92.5, puntosKpi: 18.5 });
   });
-  it.each([0, 1])('mantiene pendiente el mes con %s inspecciones', n => {
+  it.each([0, 1, 2, 3])('mantiene pendiente el mes con %s inspecciones', n => {
     expect(resumenCincoS(Array(n).fill({ puntos: Array(20).fill(5) }))).toMatchObject({ completo: false, promedio: null, puntosKpi: null });
   });
-  it('dos inspecciones en cero producen un aporte real de cero', () => {
-    expect(resumenCincoS(Array(2).fill({ puntos: Array(20).fill(0) }))).toMatchObject({ completo: true, promedio: 0, puntosKpi: 0 });
+  it('cuatro inspecciones en cero producen un aporte real de cero', () => {
+    expect(resumenCincoS(Array(4).fill({ puntos: Array(20).fill(0) }))).toMatchObject({ completo: true, promedio: 0, puntosKpi: 0 });
   });
   it('valida el número de inspección y el tamaño de la lista en el DTO', async () => {
-    const dto = Object.assign(new GuardarCincoSDto(), { idDepartamento: 1, numero: 3, fecha: '2026-10-09', sucursal: 'Zona 7', encargado: 'Encargado', puntos: [5] });
+    const dto = Object.assign(new GuardarCincoSDto(), { idDepartamento: 1, numero: 5, fecha: '2026-10-09', sucursal: 'Zona 7', encargado: 'Encargado', puntos: [5] });
     const errors = await validate(dto);
     expect(errors.map(e => e.property)).toEqual(expect.arrayContaining(['numero', 'puntos']));
   });
@@ -44,8 +48,10 @@ describe('Integración 5S con la nota mensual', () => {
     const inspecciones = { find: jest.fn().mockResolvedValue([
       { idInspeccion: 1, puntos: [...Array(18).fill(5), 1, 0] },
       { idInspeccion: 2, puntos: [...Array(18).fill(5), 4, 0] },
+      { idInspeccion: 3, puntos: [...Array(18).fill(5), 1, 0] },
+      { idInspeccion: 4, puntos: [...Array(18).fill(5), 4, 0] },
     ]) };
-    const resultados = { findOne: jest.fn(async () => guardado), create: (x: ResultadoKpi) => x, save: jest.fn(async x => { guardado = x; return x; }) };
+    const resultados = { find: jest.fn().mockResolvedValue([]), findOne: jest.fn(async () => guardado), create: (x: ResultadoKpi) => x, save: jest.fn(async x => { guardado = x; return x; }) };
     const evaluaciones = { save: jest.fn(async x => x) };
     const manager = { getRepository: (entity: unknown) => entity === InspeccionCincoS ? inspecciones : entity === ResultadoKpi ? resultados : evaluaciones } as unknown as EntityManager;
     const e = { idEvaluacionDesempeno: 1, idDepartamento: 3, periodoAnio: 2026, periodoMes: 10, puntajeBase: '80', penalizacionTotal: '2' } as EvaluacionDesempeno;
@@ -58,6 +64,15 @@ describe('Integración 5S con la nota mensual', () => {
     await aplicarCincoS(manager, e, m, false);
     expect(e.notaFinal).toBe('86.50');
     expect(resultados.save).toHaveBeenLastCalledWith(expect.objectContaining({ valorObtenido: '92.5', puntosObtenidos: '18.5' }));
+    resultados.find.mockResolvedValue([
+      { idMetrica: 1, valorObtenido: '75', metaAplicada: '100', metrica: { codigoKpi: 'BOD_LINEAS' } },
+      { idMetrica: 2, valorObtenido: '10', metaAplicada: '20', metrica: { codigoKpi: 'BOD_TIEMPO_PREP' } },
+    ]);
+    await aplicarCincoS(manager, e, m);
+    // 11.25 de lineas + 25 provisional + 18.5 de 5S - 2 de penalizacion.
+    expect(e.notaFinal).toBe('52.75');
+    await aplicarCincoS(manager, e, m);
+    expect(e.notaFinal).toBe('52.75');
   });
   it('marca una nota provisional sin fabricar un resultado 5S con una sola inspección', async () => {
     const saveResultado = jest.fn();
@@ -85,18 +100,18 @@ describe('Permisos y registro por departamento', () => {
     const data = { manager, transaction: async (_isolation: string, f: (m: unknown) => unknown) => f(manager) } as unknown as DataSource;
     return { service: new CincoSService(data), inspecciones, departamentos, empleados, evaluaciones };
   }
-  it.each(['guardar', 'recalcular'])('%s genera las evaluaciones faltantes cuando hay dos inspecciones', async accion => {
+  it.each(['guardar', 'recalcular'])('%s genera las evaluaciones faltantes cuando hay cuatro inspecciones', async accion => {
     const primera = { numero: 1, puntos: Array(20).fill(5) };
     const segunda = { numero: 2, puntos: Array(20).fill(4) };
-    const { service, inspecciones, empleados, departamentos } = crear([primera, segunda]);
-    if (accion === 'guardar') inspecciones.find.mockResolvedValueOnce([primera]);
+    const { service, inspecciones, empleados, departamentos } = crear([primera, segunda, { ...primera, numero: 3 }, { ...segunda, numero: 4 }]);
+    if (accion === 'guardar') inspecciones.find.mockResolvedValueOnce([primera, segunda, { ...primera, numero: 3 }]);
     empleados.find.mockResolvedValue([{ idEmpleado: 7 }, { idEmpleado: 8 }]);
     const calcular = jest.spyOn(EvaluacionKpiService.prototype, 'calcularEvaluacionMensual')
       .mockResolvedValueOnce({} as Awaited<ReturnType<EvaluacionKpiService['calcularEvaluacionMensual']>>)
       .mockRejectedValueOnce(new NotFoundException('Sin métricas'));
     try {
       const respuesta = accion === 'guardar'
-        ? await service.guardar({ ...dto, numero: 2 }, usuario)
+        ? await service.guardar({ ...dto, numero: 4 }, usuario)
         : await service.recalcular(3, 2026, 10, usuario);
       expect(respuesta).toMatchObject({ evaluacionesActualizadas: 0, evaluacionesCreadas: 1, empleadosSinDatos: [8] });
       expect(calcular).toHaveBeenCalledWith(7, 3, 2026, 10);

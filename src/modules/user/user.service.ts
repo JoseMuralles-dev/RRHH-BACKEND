@@ -75,7 +75,15 @@ export class UsuariosService {
   // --- 2. LISTAR TODOS LOS USUARIOS ---
   async findAll(): Promise<Usuario[]> {
     return await this.usuarioRepository.find({
-      // Como 'rol' tiene eager: true en la Entity, traerá automáticamente los datos del Rol
+      relations: { empleado: true },
+      select: {
+        idUsuario: true, idEmpleado: true, idRol: true, correo: true,
+        estado: true, isActive: true, createdAt: true, updatedAt: true,
+        empleado: {
+          idEmpleado: true, primerNombre: true, segundoNombre: true,
+          primerApellido: true, segundoApellido: true,
+        },
+      },
     });
   }
 

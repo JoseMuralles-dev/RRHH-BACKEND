@@ -63,6 +63,22 @@ describe('Evaluación mensual por departamento', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
+  it('suma tiempo provisional una sola vez y no guarda mediciones ficticias', async () => {
+    diarias.find.mockResolvedValue([
+      { idMetrica: 1, valor: '75', metrica: { idMetrica: 1, codigoKpi: 'BOD_LINEAS', metaObjetivo: '100' } },
+      { idMetrica: 2, valor: '0', metrica: { idMetrica: 2, codigoKpi: 'BOD_TIEMPO_PREP', metaObjetivo: null } },
+    ]);
+    evaluaciones.findOne.mockResolvedValue({ idEvaluacionDesempeno: 7 });
+    resultados.findOne.mockImplementation(async ({ where }) => where.idMetrica === 99 ? null : { idResultado: 8 });
+    for (let intento = 0; intento < 2; intento++) {
+      const resumen = await service.procesarEvaluacionMensual(1, 2, 2026, 10);
+      expect(resumen.notaFinal).toBe(36.25);
+      expect(resumen.resultados.filter(r => r.asignacionProvisional)).toHaveLength(1);
+    }
+    expect(resultados.save).toHaveBeenCalledTimes(2);
+    expect(resultados.save).toHaveBeenCalledWith(expect.objectContaining({ valorObtenido: '75.00', puntosObtenidos: '11.25' }));
+  });
+
   it('selecciona empleados activos del departamento y continúa tras omisiones y errores', async () => {
     empleados.find.mockResolvedValue([1, 2, 3, 4].map(idEmpleado => ({ idEmpleado })));
     const evaluar = jest.spyOn(EvaluacionKpiService.prototype, 'calcularEvaluacionMensual');
@@ -76,11 +92,11 @@ describe('Evaluación mensual por departamento', () => {
       .mockResolvedValueOnce(respuesta(4));
     jest.spyOn(Logger, 'error').mockImplementation(() => undefined);
 
-    const resumen = await service.procesarEvaluacionesDepartamento(2, 2026, 9);
+    const resumen = await service.procesarEvaluacionesDepartamento(2, 2026, 7);
     expect(empleados.find).toHaveBeenCalledWith(expect.objectContaining({
       where: { isActive: true, puesto: { idDepartamento: 2 } },
     }));
-    expect(evaluar).toHaveBeenLastCalledWith(4, 2, 2026, 9);
+    expect(evaluar).toHaveBeenLastCalledWith(4, 2, 2026, 7);
     expect(resumen.empleadosEncontrados).toBe(4);
     expect(resumen.empleadosEvaluados).toBe(2);
     expect(resumen.empleadosSinDatos).toEqual([2]);
@@ -89,7 +105,7 @@ describe('Evaluación mensual por departamento', () => {
 
   it('rechaza departamentos inexistentes o inactivos antes de procesar empleados', async () => {
     departamentos.findOne.mockResolvedValue(null);
-    await expect(service.procesarEvaluacionesDepartamento(2, 2026, 9))
+    await expect(service.procesarEvaluacionesDepartamento(2, 2026, 7))
       .rejects.toBeInstanceOf(NotFoundException);
     expect(empleados.find).not.toHaveBeenCalled();
   });
@@ -103,7 +119,7 @@ describe('Evaluación mensual por departamento', () => {
     evaluaciones.findOne.mockResolvedValue({ idEvaluacionDesempeno: 7 });
     resultados.findOne.mockResolvedValue({ idResultado: 8 });
     rangoQuery.getOne.mockResolvedValue({ porcentajeCumplimiento: '30', puntosOtorgados: '5' });
-    const resumen = await service.procesarEvaluacionMensual(1, 2, 2026, 9);
+    const resumen = await service.procesarEvaluacionMensual(1, 2, 2026, 7);
     expect(evaluaciones.manager.transaction).toHaveBeenCalledTimes(1);
     expect(diarias.find).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ idEmpleado: 1, metrica: { idDepartamento: 2, isActive: true } }),
@@ -118,7 +134,7 @@ describe('Evaluación mensual por departamento', () => {
 
   it('no crea evaluaciones cuando no hay métricas en el período', async () => {
     diarias.find.mockResolvedValue([]);
-    await expect(service.procesarEvaluacionMensual(1, 2, 2026, 9))
+    await expect(service.procesarEvaluacionMensual(1, 2, 2026, 7))
       .rejects.toBeInstanceOf(NotFoundException);
     expect(evaluaciones.save).not.toHaveBeenCalled();
     expect(resultados.save).not.toHaveBeenCalled();
@@ -138,7 +154,7 @@ describe('Evaluación mensual por departamento', () => {
     resultados.findOne.mockResolvedValue({ idResultado: 8 });
     rangoQuery.getOne.mockResolvedValue(null);
     for (let intento = 0; intento < 2; intento++) {
-      const respuesta = await service.procesarEvaluacionMensual(1, 2, 2026, 9);
+      const respuesta = await service.procesarEvaluacionMensual(1, 2, 2026, 7);
       expect(respuesta.resultados[0]).toEqual(expect.objectContaining({
         valorMensual: 122339.2, detalleEstado: 'COMPLETO',
       }));
@@ -160,7 +176,7 @@ describe('Evaluación mensual por departamento', () => {
     evaluaciones.findOne.mockResolvedValue({ idEvaluacionDesempeno: 7 });
     resultados.findOne.mockResolvedValue({ idResultado: 8 });
     rangoQuery.getOne.mockResolvedValue(null);
-    const respuesta = await service.procesarEvaluacionMensual(1, 2, 2026, 9);
+    const respuesta = await service.procesarEvaluacionMensual(1, 2, 2026, 7);
     expect(respuesta.resultados[0].detalleEstado).toBe('REQUIERE_REPROCESAR_ETL');
     expect(detalles.save).not.toHaveBeenCalled();
   });

@@ -1,3 +1,4 @@
+import { CODIGO_TIEMPO, tiempoProvisionalVigente, resultadoTiempoProvisional } from '../../performance/services/tiempo-provisional';
 import { aporteKpi, pesoKpi } from '../../performance/services/ponderacion-kpi';
 import { cumplimientoReal } from '../../performance/services/cumplimiento-kpi';
 import { ForbiddenException, Injectable } from '@nestjs/common';
@@ -84,6 +85,7 @@ export class KpiService {
     for (const diaria of diarias) {
       if (diaria.idMetrica == null || !diaria.fecha) continue;
       const metrica = porMetrica.get(diaria.idMetrica);
+      if (tiempoProvisionalVigente(anio, mes) && metrica?.codigoKpi === CODIGO_TIEMPO) continue;
       let serie = series.get(diaria.idMetrica);
       if (!serie) {
         serie = {
@@ -113,23 +115,24 @@ export class KpiService {
       seriesDiarias: [...series.values()],
       evaluaciones: evaluaciones.map(evaluacion => {
         const propios = resultados.filter(r => r.idEvaluacionDesempeno === evaluacion.idEvaluacionDesempeno);
+        const provisional = tiempoProvisionalVigente(anio, mes) && propios.some(r => porMetrica.get(r.idMetrica)?.codigoKpi?.startsWith('BOD_'));
+        const visibles = propios.filter(r => !provisional || porMetrica.get(r.idMetrica)?.codigoKpi !== CODIGO_TIEMPO);
         const aporte = (r: ResultadoKpi) => {
           const m = porMetrica.get(r.idMetrica);
           return aporteKpi(r.valorObtenido, r.metaAplicada, m?.codigoKpi, m?.pesoPorcentaje);
         };
-        const porcentajeBase = Math.min(100, propios.reduce((total, r) => total + aporte(r), 0));
+        const porcentajeBase = Math.min(100, visibles.reduce((total, r) => total + aporte(r), provisional ? 25 : 0));
         return ({
         idEvaluacion: evaluacion.idEvaluacionDesempeno,
         idDepartamento: evaluacion.idDepartamento,
         estado: evaluacion.estado,
+        tiempoProvisional: provisional,
         puntajeBase: porcentajeBase,
         penalizacionTotal: Number(evaluacion.penalizacionTotal),
         notaFinal: Math.max(0, porcentajeBase - Number(evaluacion.penalizacionTotal)),
         metaGlobal: 100,
         calculadaEn: evaluacion.updatedAt,
-        resultados: resultados
-          .filter(r => r.idEvaluacionDesempeno === evaluacion.idEvaluacionDesempeno)
-          .map(r => {
+        resultados: [...visibles.map(r => {
             const metrica = porMetrica.get(r.idMetrica);
             return {
               idResultado: r.idResultado, idMetrica: r.idMetrica,
@@ -145,7 +148,7 @@ export class KpiService {
               detalles: detalles.filter(d => d.idResultado === r.idResultado)
                 .map(d => ({ origen: d.origen, valor: Number(d.valor), descripcion: d.descripcion })),
             };
-          }),
+          }), ...(provisional ? [resultadoTiempoProvisional()] : [])],
       }); }),
     };
   }

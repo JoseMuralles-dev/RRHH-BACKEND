@@ -1,3 +1,5 @@
+import { CODIGO_TIEMPO, tiempoProvisionalVigente } from '../../performance/services/tiempo-provisional';
+import { aporteKpi } from '../../performance/services/ponderacion-kpi';
 import { EntityManager } from 'typeorm';
 import { MetricaKpi } from '../../performance/entities/metrica-kpi.entity';
 import { EvaluacionDesempeno } from '../../performance/entities/evaluacion-desempeno.entity';
@@ -14,7 +16,7 @@ export async function asegurarMetricaCincoS(manager: EntityManager, idDepartamen
   if (!metrica) {
     metrica = await repo.save(repo.create({
       idDepartamento, codigoKpi: codigoCincoS(idDepartamento),
-      nombreKpi: '5S · Orden y limpieza', descripcion: 'Promedio de dos inspecciones del departamento. Sin cuadre de inventarios.',
+      nombreKpi: '5S · Orden y limpieza', descripcion: 'Promedio de cuatro inspecciones del departamento. Sin cuadre de inventarios.',
       unidadMedida: '%', pesoPorcentaje: '20', metaObjetivo: '100',
       tipoCalculo: 'DIRECTO', fuenteDatos: 'MANUAL', origenDatos: 'INSPECCION_5S',
       penalizacionPorEvento: '0', isActive: true,
@@ -48,12 +50,25 @@ export async function aplicarCincoS(
       puntosObtenidos: String(resumen.puntosKpi), 
       cantidadEventos: 0,
       penalizacionGenerada: '0', isActive: true,
-      observacion: `Promedio de inspecciones #${inspecciones[0].idInspeccion} y #${inspecciones[1].idInspeccion}. Peso 20%. Sin inventarios.`,
+      observacion: `Promedio de inspecciones ${inspecciones.map(i => '#' + i.idInspeccion).join(', ')}. Peso 20%. Sin inventarios.`,
     });
+    await repo.save(resultado);
+  } else if (resultado) {
+    resultado.isActive = false;
     await repo.save(resultado);
   }
   // Los puntos 5S son décimas exactas. La nota existente se almacena en centésimas.
-  const baseCentavos = Math.round(Number(evaluacion.puntajeBase) * 100) - Math.round(anterior * 100)
+  let baseOperativa: number | null = null;
+  if (baseIncluyeCincoS && tiempoProvisionalVigente(evaluacion.periodoAnio, evaluacion.periodoMes)) {
+    const existentes = await repo.find({ where: { idEvaluacionDesempeno: evaluacion.idEvaluacionDesempeno, isActive: true }, relations: { metrica: true } });
+    if (existentes.some(r => r.metrica?.codigoKpi.startsWith('BOD_'))) {
+      baseOperativa = existentes.filter(r => r.idMetrica !== metrica.idMetrica && r.metrica?.codigoKpi !== CODIGO_TIEMPO)
+        .reduce((total, r) => total + aporteKpi(r.valorObtenido, r.metaAplicada, r.metrica?.codigoKpi, r.metrica?.pesoPorcentaje), 25);
+    }
+  }
+  const baseCentavos = baseOperativa !== null
+    ? Math.round((baseOperativa + (resumen.puntosKpi ?? 0)) * 100)
+    : Math.round(Number(evaluacion.puntajeBase) * 100) - Math.round(anterior * 100)
     + Math.round((resumen.puntosKpi ?? 0) * 100);
   evaluacion.puntajeBase = Math.min(100, baseCentavos / 100).toFixed(2);
   evaluacion.notaFinal = Math.max(0, Math.min(100, baseCentavos / 100) - Number(evaluacion.penalizacionTotal)).toFixed(2);
