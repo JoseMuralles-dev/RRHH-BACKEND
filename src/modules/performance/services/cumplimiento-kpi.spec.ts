@@ -39,7 +39,7 @@ describe('Porcentaje real y nota independiente', () => {
     };
     evaluaciones.manager = manager as unknown as EntityManager;
     const service = new EvaluacionKpiService(diarias as unknown as Repository<MetricaKpiDiaria>, evaluaciones as unknown as Repository<EvaluacionDesempeno>, resultados as unknown as Repository<ResultadoKpi>, { createQueryBuilder: () => query } as unknown as Repository<RangoKpi>);
-    const respuesta = await service.procesarEvaluacionMensual(10, 1, 2026, 9);
+    const respuesta = await service.procesarEvaluacionMensual(10, 1, 2026, 7);
     expect(resultados.save).toHaveBeenCalledWith(expect.objectContaining({ valorObtenido: '126.00', porcentajeCumplimiento: '54.55', puntosObtenidos: '8.18' }));
     expect(Number(respuesta.notaFinal)).toBe(8.18);
   });

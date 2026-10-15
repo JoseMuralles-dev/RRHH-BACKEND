@@ -1,3 +1,4 @@
+import { CODIGO_TIEMPO, tiempoProvisionalVigente, resultadoTiempoProvisional } from './tiempo-provisional';
 import { aporteKpi } from './ponderacion-kpi';
 import { cumplimientoReal } from './cumplimiento-kpi';
 import { agruparDesgloseMensual } from '../utils/desglose-origen';
@@ -236,11 +237,12 @@ export class EvaluacionKpiService {
       );
     }
 
-    let puntajeBase = 0;
+    const tiempoProvisional = tiempoProvisionalVigente(anio, mes) && registrosDiarios.some(r => r.metrica.codigoKpi.startsWith('BOD_'));
+    let puntajeBase = tiempoProvisional ? 25 : 0;
 
     const penalizacionTotal = 0;
 
-    const resultadosProcesados: any[] = [];
+    const resultadosProcesados: any[] = tiempoProvisional ? [{ ...resultadoTiempoProvisional(), codigoKpi: CODIGO_TIEMPO, valorMensual: null, meta: null }] : [];
 
     /*
      * 4. Procesar cada KPI
@@ -249,6 +251,8 @@ export class EvaluacionKpiService {
 
       const codigoKpi =
         grupo.metrica.codigoKpi;
+
+      if (tiempoProvisional && codigoKpi === CODIGO_TIEMPO) continue;
 
       const valorMensual =
         this.calcularValorMensual(

@@ -6,7 +6,7 @@ import { EvaluacionDesempeno } from '../../performance/entities/evaluacion-desem
 import { InspeccionCincoS } from './inspeccion-cinco-s.entity';
 import { CATEGORIAS_CINCO_S, ESCALA_CINCO_S } from './catalogo-cinco-s';
 import { GuardarCincoSDto } from './cinco-s.dto';
-import { calcularInspeccion, resumenCincoS } from './cinco-s.reglas';
+import { calcularInspeccion, resumenCincoS, INSPECCIONES_REQUERIDAS } from './cinco-s.reglas';
 import { aplicarCincoS, asegurarMetricaCincoS } from './cinco-s.integracion';
 import { EvaluacionKpiService } from '../../performance/services/evaluacion-kpi.service';
 import { MetricaKpiDiaria } from '../../performance/entities/metrica-kpi-diaria.entity';
@@ -77,8 +77,8 @@ export class CincoSService {
       if (!departamento) throw new NotFoundException('El departamento no existe o está inactivo.');
       const repo = manager.getRepository(InspeccionCincoS);
       const existentes = await repo.find({ where: { idDepartamento: dto.idDepartamento, anio, mes } });
-      if (existentes.length >= 2 || existentes.some(i => i.numero === dto.numero)) {
-        throw new ConflictException('Ya existe esa inspección. Solo se permiten dos inspecciones por departamento y mes.');
+      if (existentes.length >= INSPECCIONES_REQUERIDAS || existentes.some(i => i.numero === dto.numero)) {
+        throw new ConflictException('Ya existe esa inspección. Solo se permiten cuatro inspecciones por departamento y mes.');
       }
       await repo.save(repo.create({
         ...dto, sucursal: dto.sucursal.trim(), encargado: dto.encargado.trim(),
@@ -150,7 +150,7 @@ export class CincoSService {
       let evaluacionesCreadas = 0;
       const empleadosSinDatos: number[] = [];
       const resumen = await this.resumen(manager, idDepartamento, anio, mes);
-      // Con dos inspecciones también generar las evaluaciones que aún no existen.
+      // Con las inspecciones requeridas también generar las evaluaciones que aún no existen.
       // No inventar una nota operativa para empleados sin métricas del período.
       if (resumen.completo) {
         const empleados = await manager.getRepository(Empleado).find({
