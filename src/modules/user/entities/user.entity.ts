@@ -21,6 +21,7 @@ export class Usuario {
 
   @Column({
     name: 'id_empleado',
+    type: 'int',
     unique: true,
     nullable: true,
   })
@@ -43,6 +44,7 @@ export class Usuario {
   passwordHash!: string;
 
   @Column({
+    type: 'varchar',
     length: 20,
     default: EstadoUsuario.ACTIVO,
   })

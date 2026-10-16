@@ -1,191 +1,130 @@
-# KPI de Ventas
+﻿# KPI de Ventas
 
-## Arquitectura y alcance
+El modulo consulta SAP por SlpCode y lo relaciona exclusivamente con empleados
+activos cuyo puesto pertenece al departamento 2. No compara nombres ni puestos.
+Los duplicados dentro de Ventas se reportan como conflicto. Bodega tambien detecta
+coincidencias multiples antes de escribir; usa su propio departamento y OHEM.empID.
 
-Backend NestJS/TypeORM/MySQL; no frontend. KpiModule publica las rutas, VentasService
-coordina permisos, SAP y persistencia; performance/services/ventas-calculo.ts amplia
-el calculo departamental con la politica porcentual existente (aporte limitado a su
-peso, cumplimiento 0..100). No cambia formulas ni pesos BOD_ ni 5S.
+## Calculo y reglas
 
-Se reutilizan metricas_kpi, rangos_kpi, metricas_kpi_diarias,
-evaluaciones_desempeno, resultados_kpi y detalle_resultado_kpi. El evaluador diario
-generico rechaza VEN_ para no crear una nota con solo nuevos clientes y omitir SAP.
-GET consulta y calcula sin escribir. POST evaluaciones guarda exclusivamente resultados
-completos. Un resultado incompleto tiene notaFinal:null y no reemplaza una evaluacion
-previa. Para consultar pendientes use estas rutas de Ventas; el dashboard generico
-solo expone evaluaciones guardadas. No hay cron de Ventas ni cierre automatico.
+- Meta mensual: 35%; meta individual monetaria del mes.
+- Meta acumulada: 15%; exige metas de enero al mes evaluado.
+- Nuevos clientes: 10%; registro manual diario reemplazable; meta de catalogo 4.
+- Notas de credito: 5%; hasta 0.45% inclusive recibe 100% de cumplimiento;
+  sobre el limite recibe 0%. La comparacion es racional, anterior al redondeo.
+  Facturacion cero/negativa deja pendiente; NC negativas requieren revision.
+- Cartera: 35%; porcentaje de cartera deudora positiva de 0 a 59 dias desde
+  contabilizacion, segun el procedimiento SAP. Aporte proporcional, maximo 35%.
+  Sin cartera deudora positiva queda pendiente, sin asumir cumplimiento.
 
-La persistencia mantiene nombres legacy puntos_obtenidos/puntaje_base: representan
-aportes porcentuales, no un incentivo. meta_global permanece 100; las metas monetarias
-se copian a meta_aplicada. Sin meta monetaria no se crea un valor ficticio.
+kpi_ventas_reglas configura NC y cartera con version y JSON. Cambios posteriores
+requieren incrementar version. La migracion inicial no reemplaza reglas existentes.
+El calculador usa codigo_kpi; FORMULA/origen_datos se conservan como metadatos.
+Sin datos/metas/reglas validas, notaFinal es null. No se redistribuyen ponderaciones.
+Los campos legacy puntos representan aportes porcentuales. Los valores se guardan
+con seis decimales y notas oficiales con dos, conforme a las columnas existentes.
 
-## Configuracion comercial
+## Actualizacion y almacenamiento
 
-| Codigo | Peso | Meta/regla |
-|---|---:|---|
-| VEN_META_MENSUAL | 35 | Meta monetaria individual del mes |
-| VEN_META_ACUMULADA | 15 | Suma de metas de enero al mes; exige todos los meses |
-| VEN_NUEVOS_CLIENTES | 10 | Total diario declarado; meta de catalogo, predeterminada 4 |
-| VEN_NOTAS_CREDITO | 5 | Referencia 0.45%; escala pendiente |
-| VEN_CARTERA_SANA | 35 | Porcentaje de cartera 0..59 dias; escala pendiente |
+La tarea diaria guarda kpi_ventas_corte por empleado/fecha y actualiza
+kpi_ventas_avance por empleado/anio/mes. Cada corte contiene acumulados, NO se deben
+sumar entre dias. Repetir una fecha reemplaza su foto. Reprocesar un corte antiguo
+no retrocede el avance mensual. Una consulta SAP atiende todo Ventas por corte.
+Nuevos clientes se mantienen en metricas_kpi_diarias, sin insertar ventas acumuladas
+como si fueran movimientos diarios. Errores SAP conservan el ultimo avance.
 
-El 5% de incentivo sobre excedente y mezcla de productos estan excluidos.
-No se redistribuyen los pesos pendientes. Sin regla no se asigna cero.
-NC y cartera usan rangos_kpi activos de su metrica. Los limites son inclusivos sobre
-el valor porcentual medido (0.45 representa 0.45%, no 45%). Debe coincidir exactamente
-una banda; huecos/solapamientos devuelven REGLA_PENDIENTE. puntos_otorgados es el
-aporte final de esa banda (0..5 NC, 0..35 cartera); porcentaje_cumplimiento 0..100.
-El script NO crea bandas: RRHH debe aprobarlas y cargarlas mediante administracion
-existente/SQL revisado. No se agrega una API generica para editar reglas en esta entrega.
-Los textos SUMA/RANGOS en tipo_calculo son varchar; no existe enum operativo de
-validacion en el motor actual. Fuente MANUAL/SAP coincide con FuenteMetrica.
+Solo resultados completos se guardan en evaluaciones_desempeno, resultados_kpi,
+detalle_resultado_kpi y kpi_ventas_snapshot. Se actualizan IDs existentes. Si un
+resultado abierto deja de ser valido, se desactiva su evaluacion y se conserva el
+avance incompleto. Periodos revisados/cerrados nunca se sobrescriben.
+El snapshot conserva datos, metas, reglas/version y resultados. Al cerrar se sigue
+leyendo ese snapshot, sin aplicar cambios futuros de reglas.
 
-## SAP: requisito previo
+GET mi-dashboard/equipo lee el avance guardado, incluyendo fechaCorte,
+actualizadoEn y desactualizado. No requiere SAP para consultar. Los cambios manuales
+de metas/clientes se reflejan en la proxima actualizacion; las rutas en-vivo permiten
+consultar antes sin guardar. Un periodo no cargado responde SIN_ACTUALIZAR.
 
-El repositorio no contiene dbo.usp_RRHH_KpiVentas. Debe estar instalado por el
-responsable de SAP y ser ejecutable por la cuenta existente. No instalar desde la app.
-SapService reutiliza getConnection y SAP_DB_*; no hay conexion/configuracion alternativa.
-Parametros tipados: FechaInicio DATE, FechaFin DATE, SlpCode INT nullable. El dashboard
-consulta una vez por periodo/equipo, con SlpCode=null, y solo devuelve filas autorizadas.
-Contrato: slpCode, vendedor, fechaInicio, fechaFin, facturacionPeriodoConIVA,
-notasCreditoPeriodoConIVA, ventasNetasPeriodoConIVA, ventasNetasAcumuladasConIVA,
-porcentajeNotasCredito, carteraDeudora, saldosAFavor, saldoNeto, carteraMenor60,
-cartera60OMas, porcentajeCarteraMenor60.
+## Rutas (prefijo /api)
 
-El acumulado SAP debe comprender enero hasta FechaFin del mismo anio. Importes con IVA:
-no sumar VatSum. Neto mensual = facturacion - NC, conservando signos de cancelatorios.
-Los porcentajes se derivan de importes con aritmetica decimal fija BigInt, seis decimales
-internos; importes/porcentajes de SAP deben ser numeros decimales finitos o cadenas
-canonicas (sin separadores de miles, maximo seis decimales). Para montos que excedan la
-precision segura del driver JS, el procedimiento debe entregarlos como texto decimal:
-la app no puede recuperar precision ya perdida en el driver. Se conserva el payload SAP
-en el snapshot. Las bandas se comparan antes del redondeo de presentacion; valores
-medidos se guardan con seis decimales. Aportes finales y notas guardadas: dos decimales.
+- GET /kpi/ventas/mi-dashboard?anio=2026&mes=10
+- GET /kpi/ventas/equipo?anio=2026&mes=10&idEmpleado=21 (filtro opcional)
+- GET /kpi/ventas/mi-dashboard-en-vivo?anio=2026&mes=10
+- GET /kpi/ventas/equipo-en-vivo?anio=2026&mes=10
+- POST /kpi/ventas/actualizar con {"fechaCorte":"2026-10-15"}: RRHH/admin.
+- POST /kpi/ventas/evaluaciones con {"idEmpleado":21,"anio":2026,"mes":10}
+- GET /kpi/ventas/empleados
+- GET /kpi/ventas/metas?anio=2026&mes=10&idEmpleado=21
+- PUT /kpi/ventas/metas con {"idEmpleado":21,"anio":2026,"mes":10,"metaObjetivo":"25000"}
+- GET /kpi/ventas/nuevos-clientes?idEmpleado=21&fecha=2026-10-15
+- PUT /kpi/ventas/nuevos-clientes con {"idEmpleado":21,"fecha":"2026-10-15","cantidad":2}
 
-Criterios devueltos en cada respuesta:
-- RefDate, no DueDate, para antiguedad; menor a 60 = 0..59.
-- Cartera deudora positiva separada de saldos a favor.
-- Cartera historica no certificada: conciliaciones anuladas posteriormente pendientes
-  de validacion. No presentar ese componente historico como exacto.
-- Nuevos clientes son cantidades declaradas; no se verifica identidad/unicidad.
-- Sin facturacion positiva o sin cartera deudora positiva: SIN_DENOMINADOR, valor null.
-- Error SAP: HTTP 503 SAP_NO_DISPONIBLE, nunca ventas cero.
+Todas requieren JWT. Empleado consulta solo sus resultados; encargado su equipo;
+RRHH/admin todo Ventas. Solo RRHH/admin cambian metas o ejecutan carga global.
+El servicio vuelve a comprobar actor activo/rol/alcance en base de datos.
+La tarea usa el mismo servicio y bloqueo MySQL que el endpoint de actualizacion.
+Bloqueos por empleado serializan escritura manual y evaluacion.
 
-## Identidad y autorizacion
+## Instalacion en el VPS
 
-Bearer JWT en todas las rutas. Se carga usuario activo y rol activo desde MySQL usando
-el idUsuario autenticado. El departamento de Ventas es exclusivamente el ID 2, confirmado por el responsable.
-Las cinco metricas VEN_ deben estar configuradas en ese departamento activo.
-No se comparan nombres de departamento, puesto, empleado ni vendedor para relacionar.
+1. Respaldar y probar scripts/sql/20261015-kpi-ventas.sql en una copia. Es el unico
+   script de esta entrega: verificaciones, DDL separado, configuracion y consultas.
+   La base revisada es intertornillos_rrhh_1, en minusculas. Mantener synchronize:false.
+   Reutiliza las 12 metas existentes; no modifica pesos/configuracion de Bodega.
+   Ya existen DECIMAL(18,6) y unicidad diaria; no necesitan ALTER.
+   Metas usa SMALLINT/TINYINT y TIMESTAMP: compatibles, no requieren conversion.
+   Reemplaza UNIQUE SAP por indice no unico, por lo que debe desplegarse este backend.
+   DDL no se revierte con ROLLBACK. Usar cliente que aborte al primer error, sin --force.
+2. Publicar backend, npm ci --include=dev y npm run build; ejecutar el SQL y reiniciar
+   backend antes de admitir trafico. No se ejecuta SQL automaticamente al iniciar.
+3. Configurar .env:
 
-Solo empleados activos cuyo puesto pertenece al departamento 2; codigo_sap_empleado = OSLP.SlpCode.
-No OHEM, no nombre. null/vacio/invalido: CODIGO_SAP_INVALIDO. Duplicados activos de
-Ventas: CONFLICTO_CODIGO_SAP (tambien si el otro vendedor no pertenece al equipo del
-encargado). Sin fila SAP: SIN_CORRESPONDENCIA, no cero. Una fila SAP repetida tambien
-es conflicto. Bodega usa OHEM como antes, ahora acotado al departamento de metricas BOD_.
+```dotenv
+DB_DATABASE=intertornillos_rrhh_1
+KPI_VENTAS_USUARIO_ID=ID_REAL_DE_USUARIO_RRHH_O_ADMIN
+```
 
-- Empleado: GET propio y sus metas, sin escritura.
-- Encargado: equipo directo; consulta propia si pertenece a Ventas; captura y guarda
-  evaluaciones de subordinados. No configura metas monetarias.
-- RRHH/admin: empleados activos de Ventas; configura metas y captura.
-- idEmpleado de query/body nunca sustituye autorizacion.
+4. Verificar dbo.usp_RRHH_KpiVentas en SAP con parametros FechaInicio DATE,
+   FechaFin DATE, SlpCode INT nullable. Debe cumplir el contrato VentasSap del codigo.
+   El procedimiento SAP no esta incluido en este repositorio. No se ha probado su
+   ejecucion real en esta entrega. Cartera historica depende de su reconstruccion.
+5. Probar carga de ayer (sin token HTTP, lee .env del directorio actual):
 
-## Rutas y ejemplos
+```bash
+cd /var/www/rrhh-backend
+node dist/actualizar-kpi-ventas.js
+```
 
-Prefijo global de despliegue: /api. Ejemplos requieren Authorization: Bearer <JWT>.
+Carga manual de una fecha o recuperacion de un rango (maximo 366 dias terminados):
 
-GET /api/kpi/ventas/mi-dashboard?anio=2026&mes=9
-GET /api/kpi/ventas/equipo?anio=2026&mes=9
-GET /api/kpi/ventas/metas?idEmpleado=21&anio=2026&mes=9
-Devuelve las metas desde enero hasta el mes consultado. Sin idEmpleado usa el propio.
+```bash
+node dist/actualizar-kpi-ventas.js 2026-08-31
+node dist/actualizar-kpi-ventas.js 2026-08-01 2026-08-31
+```
 
-PUT /api/kpi/ventas/metas
-Content-Type: application/json
-{ "idEmpleado": 21, "anio": 2026, "mes": 9, "metaObjetivo": "50000.00" }
-El monto es solo un ejemplo de formato; usar la meta real aprobada. Se guarda sobre
-VEN_META_MENSUAL; el acumulado se deriva, no se ingresa por separado. Meta positiva,
-maximo 12 enteros y 2 decimales. Permite planificar metas futuras.
+Para poblar meses previos basta cargar el ultimo dia de cada mes si no necesitas
+las fotos de todos los dias. El resultado actualiza el acumulado mensual.
+Una carga parcial imprime empleados con errores y termina con codigo de salida 1.
+Los empleados sin relacion SAP no se convierten en ventas cero.
 
-PUT /api/kpi/ventas/nuevos-clientes
-{ "idEmpleado": 21, "fecha": "2026-10-15", "cantidad": 2 }
-Repetir la peticion conserva 2, no lo convierte en 4. Cantidad entera 0..1000000.
-Fecha real no futura. Se audita anterior/nuevo y actor en la misma transaccion.
+6. Ajustar User/Group y ruta de Node en scripts/systemd/rrhh-kpi-ventas.service.
+   El usuario debe poder leer proyecto/.env y escribir donde lo requiera el backend.
 
-POST /api/kpi/ventas/evaluaciones
-{ "idEmpleado": 21, "anio": 2026, "mes": 9 }
-Reutiliza evaluacion/resultado existente; recalcula solo BORRADOR/CALCULADA, no duplica
-resultados. Si falta algo: guardado:false, sin escrituras en evaluaciones/resultados.
-Si completo: guardado:true, idEvaluacion, y dashboard. El mes actual sigue provisional.
+```bash
+sudo cp scripts/systemd/rrhh-kpi-ventas.service /etc/systemd/system/
+sudo cp scripts/systemd/rrhh-kpi-ventas.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start rrhh-kpi-ventas.service
+sudo journalctl -u rrhh-kpi-ventas.service -n 80 --no-pager
+sudo systemctl enable --now rrhh-kpi-ventas.timer
+sudo systemctl list-timers --all rrhh-kpi-ventas.timer
+```
 
-Forma ilustrativa de resultado pendiente (los importes son ejemplos, no datos SAP):
-{
-  "periodo": { "anio": 2026, "mes": 9, "fechaInicio": "2026-09-01", "fechaFin": "2026-09-30", "provisional": false },
-  "criterios": ["..."],
-  "empleados": [{ "idEmpleado": 21, "estado": "INCOMPLETA", "notaFinal": null,
-    "resultados": [{ "codigo": "VEN_NOTAS_CREDITO", "pesoPorcentaje": 5,
-      "valorObtenido": "0.450000", "metaAplicada": "0.45", "estado": "REGLA_PENDIENTE", "puntos": null }]
-  }]
-}
-La respuesta real contiene los cinco resultados y los datos SAP del vendedor autorizado.
-Otros estados: SIN_META, META_INCOMPLETA con mesesFaltantes, SIN_DENOMINADOR,
-CONFLICTO_REGISTROS_DIARIOS y CERRADA_SIN_SNAPSHOT. Errores de configuracion/periodo
-cerrado: 409; alcance: 403; periodo futuro o datos invalidos: 400.
+Ejecuta a la 01:30 America/Guatemala y carga ayer. El primero del mes actualiza
+el mes anterior; no necesita otra tarea mensual. Persistent recupera una ejecucion
+pendiente, no todos los dias perdidos: usar rango tras una caida prolongada.
+Reprocesar explicitamente meses anteriores para correcciones tardias de SAP.
 
-## Historia, cierre y concurrencia
-
-KPI_TIME_ZONE=America/Guatemala es el valor por defecto (opcional en .env).
-Mes actual hasta hoy local; anterior hasta ultimo dia; futuro no se evalua.
-Se bloquea la fila empleado durante escritura. Se rechaza modificar un periodo con
-estado distinto de BORRADOR/CALCULADA; cambiar una meta mensual tambien se rechaza
-si afectaria un acumulado cerrado posterior en el mismo anio.
-
-kpi_ventas_snapshot conserva datos SAP, metas, pesos, bandas y resultado de cada
-evaluacion guardada. Una evaluacion cerrada se lee de ese snapshot sin consultar SAP.
-Cerradas antiguas sin snapshot se informan explicitamente; no se reconstruyen con reglas
-actuales. Observacion de resultados guarda version/peso/regla para el dashboard generico,
-que usa el aporte persistido VEN_ en lugar de recalcularlo con una formula proporcional.
-Detalle_resultado_kpi es resumen con precision legacy; snapshot/resultado son la fuente
-precisa. Cambiar configuracion no modifica una evaluacion cerrada automaticamente.
-
-No habia una tabla equivalente de metas ni auditoria generica de KPI en el repositorio.
-Se crean metas_kpi_empleado, kpi_cambios (append-only) y kpi_ventas_snapshot. Nuevos clientes
-reutiliza metricas_kpi_diarias con fuente MANUAL y su unicidad empleado/metrica/fecha.
-No hay consolidacion ni borrado automatico de duplicados heredados. Las escrituras
-nuevas son transaccionales; las validaciones del codigo SAP por departamento se hacen
-en la aplicacion y el dashboard detecta conflictos, incluso si otro proceso inserta datos.
-
-## Instalacion revisable, no ejecutada por el agente
-
-1. Respaldar MySQL y probar primero en una copia. Revisar SHOW CREATE TABLE de empleados,
-   metricas_kpi_diarias, resultados_kpi, rangos_kpi y tablas nuevas si ya existen.
-2. Revisar scripts/sql/20261015-kpi-ventas.sql y verificar que el departamento 2 este activo. Inventariar cualquier metrica de mezcla; el script desactiva VEN_MEZCLA
-   y VEN_MEZCLA_PRODUCTOS sin borrar historia. Si tiene otro codigo, desactivarlo explicitamente.
-3. Coordinar ventana de mantenimiento: detener tareas ETL/escrituras, aplicar el script
-   y poner esta version del backend antes de admitir codigos repetidos entre departamentos.
-   El backend viejo de Bodega no tiene el filtro nuevo y podria relacionar otro empleado.
-4. Desde la terminal MySQL (password interactivo, nunca incluirlo en comandos):
-
-   mysql -h HOST_MYSQL -u USUARIO_MYSQL -p BASE_RRHH
-   SOURCE /var/www/rrhh-backend/scripts/sql/20261015-kpi-ventas.sql;
-
-   No usar --force. El procedimiento aborta ante duplicados o catalogo inconsistente.
-   Los ALTER TABLE tienen commit implicito: la migracion no es atomicamente reversible;
-   revisar el error antes de reintentar. CREATE IF NOT EXISTS no sustituye comparar esquemas.
-5. Instalar dependencias del proyecto y compilar con Node 20.19+ o 22.12+:
-
-   npm ci --include=dev
-   npm run build
-   npm test -- --runInBand src/modules/performance src/modules/kpi src/modules/integrations/sap
-
-6. Responsable SAP verifica instalacion/contrato/permisos EXECUTE del procedimiento.
-   Usar las variables SAP_DB_* existentes; no hay secretos nuevos. Mantener synchronize:false.
-7. Configurar metas reales enero..mes y aprobar bandas NC/cartera antes de publicar nota.
-   Probar HTTP autenticado en entorno de pruebas con datos reales antes de produccion.
-
-La migracion quita el indice UNIQUE global de codigo_sap_empleado (lo descubre por
-columnas, no nombre inventado), valida duplicados por departamento, asegura unicidad
-existente de diarios sin consolidarlos, y amplia solo precision de valores/rangos.
-No convierte ni renumera codigos existentes. Verificar que Ventas contenga SlpCode real.
-No se ejecutaron migraciones, consultas SAP reales ni despliegues durante implementacion.
-
-Integracion frontend: GET /api/kpi/ventas/empleados devuelve idEmpleado/nombre dentro del alcance sin depender de SAP. GET /api/kpi/ventas/nuevos-clientes?idEmpleado=21&fecha=2026-10-15 consulta el total diario (cantidad:null si no existe registro), con la misma autorizacion. El frontend usa estas rutas antes de editar y no requiere acceso a SAP para guardar entradas.
+No se ejecutaron migraciones ni cargas reales ni despliegues en esta entrega.
+Las pruebas HTTP usan guard JWT sustituido; verifican DTO, rutas y RolesGuard real.
+Las pruebas del servicio usan repositorios/SAP simulados; no certifican el SQL en MySQL.

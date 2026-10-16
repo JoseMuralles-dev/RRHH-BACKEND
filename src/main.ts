@@ -17,7 +17,7 @@ async function bootstrap() {
     }),
   );
    app.enableCors({
-    origin: ['http://localhost:4200', 'https://5358p146-4200.use.devtunnels.ms',],
+    origin: ['http://localhost:4200', 'https://5358p146-4200.use.devtunnels.ms', 'https://rrhh.intertornillos.com', 'https://rrhh.intertornillos.com:3000'],
     
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

@@ -66,6 +66,14 @@ describe('Notificaciones dentro de la transaccion de solicitudes', () => {
   const service = new NotificacionesService(source as unknown as DataSource);
   beforeEach(() => {
     jest.clearAllMocks();
+    (manager.getRepository as jest.Mock).mockImplementation(entity => {
+      if (entity === Empleado) return empleados;
+      if (entity === Usuario) return usuarios;
+      if (entity === Notificacion) return notificaciones;
+      throw new Error('Repositorio inesperado');
+    });
+    notificaciones.create.mockImplementation(x => x);
+    notificaciones.save.mockImplementation(async x => x);
     usuarios.findOne.mockResolvedValue({ idUsuario: 9 });
     empleados.findOne.mockReset();
   });

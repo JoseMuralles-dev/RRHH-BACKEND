@@ -12,10 +12,10 @@ export class UsoEvento {
   @Column({ length: 40 }) accion!: string;
   @Column({ length: 12 }) origen!: 'API' | 'NAVEGACION';
   @Column({ length: 10 }) metodo!: string;
-  @Column({ length: 180, nullable: true }) ruta!: string | null;
+  @Column({ type: 'varchar', length: 180, nullable: true }) ruta!: string | null;
   @Column({ name: 'estado_http', type: 'smallint' }) estadoHttp!: number;
   @Column({ name: 'exito', type: 'boolean' }) exito!: boolean;
   @Column({ name: 'duracion_ms', type: 'int', unsigned: true }) duracionMs!: number;
-  @Column({ name: 'evento_cliente', length: 36, nullable: true }) eventoCliente!: string | null;
+  @Column({ name: 'evento_cliente', type: 'varchar', length: 36, nullable: true }) eventoCliente!: string | null;
   @Column({ name: 'fecha_utc', type: 'datetime', precision: 3 }) fechaUtc!: string;
 }
