@@ -12,6 +12,11 @@ import { ResultadoKpi } from '../../performance/entities/resultado-kpi.entity';
 import { DetalleResultadoKpi } from '../../performance/entities/detalle-resultado-kpi.entity';
 import { DashboardKpiResponseDto, SerieDiariaKpiDto } from '../dto/dashboard-kpi-response.dto';
 
+function pesoHistoricoVentas(observacion: string, configurado: string): number {
+  try { const peso = JSON.parse(observacion).pesoPorcentaje; if (typeof peso === 'number' && Number.isFinite(peso)) return peso; } catch {}
+  return Number(configurado);
+}
+
 const numeroNullable = (valor: string | null): number | null =>
   valor == null ? null : Number(valor);
 
@@ -119,6 +124,7 @@ export class KpiService {
         const visibles = propios.filter(r => !provisional || porMetrica.get(r.idMetrica)?.codigoKpi !== CODIGO_TIEMPO);
         const aporte = (r: ResultadoKpi) => {
           const m = porMetrica.get(r.idMetrica);
+          if (m?.codigoKpi.startsWith('VEN_')) return Number(r.puntosObtenidos);
           return aporteKpi(r.valorObtenido, r.metaAplicada, m?.codigoKpi, m?.pesoPorcentaje);
         };
         const porcentajeBase = Math.min(100, visibles.reduce((total, r) => total + aporte(r), provisional ? 25 : 0));
@@ -140,8 +146,8 @@ export class KpiService {
               unidadMedida: metrica?.unidadMedida ?? null,
               valorObtenido: Number(r.valorObtenido),
               metaAplicada: numeroNullable(r.metaAplicada),
-              porcentajeCumplimiento: cumplimientoReal(r.valorObtenido, r.metaAplicada, metrica?.codigoKpi),
-              pesoPorcentaje: pesoKpi(metrica?.codigoKpi, metrica?.pesoPorcentaje),
+              porcentajeCumplimiento: metrica?.codigoKpi.startsWith('VEN_') ? numeroNullable(r.porcentajeCumplimiento) : cumplimientoReal(r.valorObtenido, r.metaAplicada, metrica?.codigoKpi),
+              pesoPorcentaje: metrica?.codigoKpi.startsWith('VEN_') && r.observacion?.startsWith('{') ? pesoHistoricoVentas(r.observacion, metrica.pesoPorcentaje) : pesoKpi(metrica?.codigoKpi, metrica?.pesoPorcentaje),
               aportePorcentaje: aporte(r),
               puntosObtenidos: aporte(r),
               observacion: r.observacion === 'No existe rango configurado para el valor obtenido.' ? null : r.observacion,

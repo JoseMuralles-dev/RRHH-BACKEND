@@ -1,3 +1,5 @@
+import { ServiceUnavailableException } from '@nestjs/common';
+import type { VentasSap } from './interfaces/ventas-sap.interface';
 import {Injectable, InternalServerErrorException,} from '@nestjs/common';
 
 import { ConfigService } from '@nestjs/config';
@@ -39,6 +41,24 @@ export class SapService {
     return pool.connect();
   }
 
+
+  async obtenerKpiVentas(fechaInicio: string, fechaFin: string, slpCode: number | null = null): Promise<VentasSap[]> {
+    let pool: sql.ConnectionPool | undefined;
+    try {
+      pool = await this.getConnection();
+      const respuesta = await pool.request()
+        .input('FechaInicio', sql.Date, fechaInicio)
+        .input('FechaFin', sql.Date, fechaFin)
+        .input('SlpCode', sql.Int, slpCode)
+        .execute('dbo.usp_RRHH_KpiVentas');
+      if (!Array.isArray(respuesta.recordset)) throw new Error('Contrato SAP invalido');
+      return respuesta.recordset as VentasSap[];
+    } catch {
+      throw new ServiceUnavailableException({ estado: 'SAP_NO_DISPONIBLE', message: 'No fue posible consultar KPI de Ventas en SAP' });
+    } finally {
+      if (pool) await pool.close();
+    }
+  }
 
   async obtenerMetricasBodega(
     fechaInicial: string,

@@ -36,8 +36,8 @@ export class ResultadoKpi {
   @Column({
     name: 'valor_obtenido',
     type: 'decimal',
-    precision: 14,
-    scale: 2,
+    precision: 18,
+    scale: 6,
   })
   valorObtenido!: string;
 

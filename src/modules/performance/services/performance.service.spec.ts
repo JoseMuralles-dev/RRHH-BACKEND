@@ -12,7 +12,7 @@ describe('ETL de artículos con desglose', () => {
       TotalArticulos: '37788.25', TotalArticulosTraslados: '84550.95',
     }]) };
     const metricas = { find: jest.fn().mockResolvedValue([
-      { idMetrica: 3, codigoKpi: 'BOD_ARTICULOS' },
+      { idMetrica: 3, idDepartamento: 3, codigoKpi: 'BOD_ARTICULOS' },
     ]) };
     const empleados = { findOne: jest.fn().mockResolvedValue({ idEmpleado: 22 }) };
     const registro = { idRegistro: 10, valor: '1', desgloseOrigen: null };
@@ -24,6 +24,7 @@ describe('ETL de artículos con desglose', () => {
       empleados as unknown as Repository<Empleado>,
     );
     await service.procesarMetricasBodega('2026-08-01');
+    expect(empleados.findOne).toHaveBeenCalledWith({ where: { codigoSapEmpleado: 22, isActive: true, puesto: { idDepartamento: 3 } } });
     expect(diarias.save).toHaveBeenCalledWith(expect.objectContaining({
       idRegistro: 10, valor: '122339.2', fuente: 'SAP', desgloseOrigen: [
         { origen: 'FACTURAS', valor: '37788.25' },

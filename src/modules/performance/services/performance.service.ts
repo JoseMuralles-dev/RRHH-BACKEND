@@ -69,6 +69,8 @@ export class PerformanceService {
     // 4. CREAR MAPA DE MÉTRICAS
     // =========================================
 
+    const departamentosBodega = [...new Set(metricas.map(m => m.idDepartamento))];
+    if (departamentosBodega.length !== 1 || !Number.isSafeInteger(departamentosBodega[0])) throw new InternalServerErrorException('Configure las metricas de Bodega en un unico departamento');
     const mapaMetricas =
       new Map(
         metricas.map(
@@ -116,6 +118,7 @@ export class PerformanceService {
           where: {
             codigoSapEmpleado:
               codigoSap,
+            isActive: true, puesto: { idDepartamento: departamentosBodega[0] },
           },
         });
 

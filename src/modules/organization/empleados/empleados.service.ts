@@ -7,7 +7,7 @@ import {
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Like, Repository } from 'typeorm';
+import { Like, Not, Repository } from 'typeorm';
 
 import { Empleado } from './entities/empleado.entity';
 
@@ -72,6 +72,7 @@ export class EmpleadosService {
       const sapExistente = await this.empleadoRepository.findOne({
         where: {
           codigoSapEmpleado: dto.codigoSapEmpleado,
+          isActive: true, puesto: { idDepartamento: puesto.idDepartamento },
         },
       });
 
@@ -338,21 +339,15 @@ export class EmpleadosService {
     // Validar código SAP
     // ----------------------------------------------------------
 
-    if (
-      dto.codigoSapEmpleado !== undefined &&
-      dto.codigoSapEmpleado !== null &&
-      dto.codigoSapEmpleado !== empleado.codigoSapEmpleado
-    ) {
-      const sapExistente = await this.empleadoRepository.findOne({
-        where: {
-          codigoSapEmpleado: dto.codigoSapEmpleado,
-        },
-      });
-
-      if (sapExistente) {
-        throw new ConflictException(
-          'El código SAP ya pertenece a otro empleado',
-        );
+    if (dto.codigoSapEmpleado !== undefined || dto.idPuesto !== undefined) {
+      const codigo = dto.codigoSapEmpleado === undefined ? empleado.codigoSapEmpleado : dto.codigoSapEmpleado;
+      if (codigo !== null && codigo !== undefined) {
+        const puesto = await this.puestoRepository.findOne({ where: { idPuesto: dto.idPuesto ?? empleado.idPuesto } });
+        if (!puesto) throw new NotFoundException('Puesto no encontrado');
+        const duplicado = await this.empleadoRepository.findOne({ where: {
+          codigoSapEmpleado: codigo, isActive: true, puesto: { idDepartamento: puesto.idDepartamento }, idEmpleado: Not(idEmpleado),
+        } });
+        if (duplicado) throw new ConflictException('Codigo SAP duplicado dentro del departamento');
       }
     }
 

@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { CODIGO_TIEMPO, tiempoProvisionalVigente, resultadoTiempoProvisional } from './tiempo-provisional';
 import { aporteKpi } from './ponderacion-kpi';
 import { cumplimientoReal } from './cumplimiento-kpi';
@@ -153,6 +154,9 @@ export class EvaluacionKpiService {
         },
       });
 
+    if (registrosDiarios.some(r => r.metrica.codigoKpi.startsWith('VEN_'))) {
+      throw new ConflictException('Use /kpi/ventas/evaluaciones para evaluar Ventas con sus cinco indicadores');
+    }
     if (registrosDiarios.length === 0) {
       throw new NotFoundException(
         'No existen métricas diarias para este empleado en el período indicado.',

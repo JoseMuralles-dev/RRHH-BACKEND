@@ -29,7 +29,6 @@ export class Empleado {
   @Column({
     name: 'codigo_sap_empleado',
     nullable: true,
-    unique: true,
     type: 'int'
   })
   codigoSapEmpleado?: number | null;

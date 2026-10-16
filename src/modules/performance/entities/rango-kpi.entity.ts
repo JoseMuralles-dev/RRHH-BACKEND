@@ -25,16 +25,16 @@ export class RangoKpi {
   @Column({
     name: 'valor_minimo',
     type: 'decimal',
-    precision: 14,
-    scale: 2,
+    precision: 18,
+    scale: 6,
   })
   valorMinimo!: string;
 
   @Column({
     name: 'valor_maximo',
     type: 'decimal',
-    precision: 14,
-    scale: 2,
+    precision: 18,
+    scale: 6,
   })
   valorMaximo!: string;
 

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as sql from 'mssql';
 import { SapService } from './sap.service';
 
-jest.mock('mssql', () => ({ ConnectionPool: jest.fn(), Date: 'Date' }));
+jest.mock('mssql', () => ({ ConnectionPool: jest.fn(), Date: 'Date', Int: 'Int' }));
 
 describe('SAP: parametros y cierre de conexiones (driver simulado)', () => {
   const req = { input: jest.fn().mockReturnThis(), execute: jest.fn() };
@@ -56,5 +56,20 @@ describe('SAP: parametros y cierre de conexiones (driver simulado)', () => {
       service.obtenerMetricasBodega('2026-10-01', '2026-10-02'),
     ).rejects.toBeInstanceOf(InternalServerErrorException);
     expect(req.execute).not.toHaveBeenCalled();
+  });
+
+  it('Ventas reutiliza la conexion y parametriza el procedimiento', async () => {
+    req.execute.mockResolvedValue({recordset: []});
+    await service.obtenerKpiVentas('2026-01-01','2026-01-31',5);
+    expect(req.input).toHaveBeenCalledWith('FechaInicio',sql.Date,'2026-01-01');
+    expect(req.input).toHaveBeenCalledWith('FechaFin',sql.Date,'2026-01-31');
+    expect(req.input).toHaveBeenCalledWith('SlpCode',sql.Int,5);
+    expect(req.execute).toHaveBeenCalledWith('dbo.usp_RRHH_KpiVentas');
+    expect(pool.close).toHaveBeenCalledTimes(1);
+  });
+  it('Ventas devuelve disponibilidad en lugar de ceros', async () => {
+    req.execute.mockRejectedValue(new Error('SAP caido'));
+    await expect(service.obtenerKpiVentas('2026-01-01','2026-01-31')).rejects.toMatchObject({status:503});
+    expect(pool.close).toHaveBeenCalledTimes(1);
   });
 });
