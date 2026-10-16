@@ -36,4 +36,44 @@ describe('Calculo Ventas', () => {
     expect(periodoVentas(2026, 9, 'America/Guatemala', new Date('2026-10-01T02:00:00Z')).fechaFin).toBe('2026-09-30');
     expect(() => periodoVentas(2026, 10, 'America/Guatemala', new Date('2026-10-01T02:00:00Z'))).toThrow();
   });
+  it('no aplica una banda de una metrica inactiva aunque exista', () => {
+    const m=metricas.map(x=>({...x,isActive:x.codigoKpi!=='VEN_NOTAS_CREDITO'}));
+    const r=calcularVentas(sap,2,metas,dec(4),m,[{idMetrica:4,isActive:true,valorMinimo:'0',valorMaximo:'1',puntosOtorgados:'5',porcentajeCumplimiento:'100'}] as any);
+    expect(r.resultados[3].estado).toBe('REGLA_PENDIENTE');expect(r.resultados[3].puntos).toBeNull();
+  });
+
+  const configuradas = [
+    {idMetrica:4,version:1,configuracion:{tipo:'UMBRAL_MAXIMO',umbral:'0.45',cumplimientoHastaUmbral:'100',cumplimientoSobreUmbral:'0'}},
+    {idMetrica:5,version:2,configuracion:{tipo:'PROPORCIONAL',base:'100',cumplimientoMaximo:'100'}}
+  ] as any;
+  it.each([['44.99','5.0000'],['45','5.0000'],['45.01','0.0000']])('regla NC aprobada: %s', (nc,puntos) => {
+    const r=calcularVentas({...sap,notasCreditoPeriodoConIVA:nc},2,metas,dec(4),metricas,[],configuradas);
+    expect(r.resultados[3].puntos).toBe(puntos);
+  });
+  it('compara NC antes de truncar incluso mas alla del sexto decimal',()=>{
+    const r=calcularVentas({...sap,facturacionPeriodoConIVA:'1000000',notasCreditoPeriodoConIVA:'4500.000001'},2,metas,dec(4),metricas,[],configuradas);
+    expect(r.resultados[3].valorObtenido).toBe('0.450000');
+    expect(r.resultados[3].puntos).toBe('0.0000');
+  });
+  it('NC negativas quedan para revision sin puntos',()=>{
+    const r=calcularVentas({...sap,notasCreditoPeriodoConIVA:'-1'},2,metas,dec(4),metricas,[],configuradas);
+    expect(r.resultados[3].estado).toBe('REVISION_NC_NEGATIVAS');
+    expect(r.resultados[3].puntos).toBeNull();expect(r.notaFinal).toBeNull();
+  });
+  it.each(['0','-1'])('sin facturacion positiva %s no otorga puntos NC',v=>{
+    const r=calcularVentas({...sap,facturacionPeriodoConIVA:v},2,metas,dec(4),metricas,[],configuradas);
+    expect(r.resultados[3].estado).toBe('SIN_DENOMINADOR');expect(r.resultados[3].puntos).toBeNull();
+  });
+  it('cartera 80% aporta 28 y guarda la version aplicada',()=>{
+    const r=calcularVentas(sap,2,metas,dec(4),metricas,[],configuradas);
+    expect(r.resultados[4].porcentajeCumplimiento).toBe('80.0000');
+    expect(r.resultados[4].puntos).toBe('28.0000');
+    expect(r.resultados[4].reglaAplicada).toEqual(expect.objectContaining({version:2,configuracion:configuradas[1].configuracion}));
+  });
+  it('cartera limita su aporte a 35 y sin cartera deja pendiente',()=>{
+    expect(calcularVentas({...sap,carteraMenor60:'1200'},2,metas,dec(4),metricas,[],configuradas).resultados[4].puntos).toBe('35.0000');
+    const r=calcularVentas({...sap,carteraDeudora:'0'},2,metas,dec(4),metricas,[],configuradas);
+    expect(r.resultados[4].puntos).toBeNull();expect(r.notaFinal).toBeNull();
+  });
+
 });

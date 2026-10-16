@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
@@ -113,14 +113,18 @@ export class PerformanceService {
 
       // Buscar el empleado en la base de la APP
       // utilizando OHEM.empID
-      const empleado =
-        await this.empleadoRepository.findOne({
+      const coincidenciasEmpleado =
+        await this.empleadoRepository.find({
+          take: 2,
           where: {
             codigoSapEmpleado:
               codigoSap,
             isActive: true, puesto: { idDepartamento: departamentosBodega[0] },
           },
         });
+
+      if (coincidenciasEmpleado.length > 1) throw new ConflictException('CONFLICTO_CODIGO_SAP_BODEGA');
+      const empleado = coincidenciasEmpleado[0];
 
       // Si SAP tiene al preparador
       // pero RRHH todavía no tiene la relación

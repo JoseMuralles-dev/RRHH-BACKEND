@@ -24,3 +24,7 @@ export class ConsultaClientesVentasDto {
   @Type(() => Number) @IsInt() @Min(1) idEmpleado!: number;
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) fecha!: string;
 }
+
+export class ActualizarVentasDto {
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) fechaCorte!: string;
+}

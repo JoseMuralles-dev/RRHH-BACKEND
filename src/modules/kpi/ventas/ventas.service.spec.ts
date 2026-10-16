@@ -1,3 +1,5 @@
+import { KpiVentasRegla } from '../../performance/entities/kpi-ventas-regla.entity';
+import { KpiVentasAvance, KpiVentasCorte } from '../../performance/entities/kpi-ventas-avance.entity';
 import { ResultadoKpi } from '../../performance/entities/resultado-kpi.entity';
 import { DetalleResultadoKpi } from '../../performance/entities/detalle-resultado-kpi.entity';
 import { KpiVentasSnapshot } from '../../performance/entities/kpi-ventas-snapshot.entity';
@@ -16,12 +18,17 @@ describe('Ventas acceso y escritura', () => {
   let service: VentasService, repos: Map<any, any>, sap: any, db: any;
   beforeEach(() => {
     repos = new Map();
-    for (const t of [Empleado, Usuario, Departamento, MetricaKpi, MetricaKpiDiaria, MetaKpiEmpleado, RangoKpi, EvaluacionDesempeno, KpiCambio, KpiVentasSnapshot, ResultadoKpi, DetalleResultadoKpi])
+    for (const t of [KpiVentasRegla, KpiVentasAvance, KpiVentasCorte, Empleado, Usuario, Departamento, MetricaKpi, MetricaKpiDiaria, MetaKpiEmpleado, RangoKpi, EvaluacionDesempeno, KpiCambio, KpiVentasSnapshot, ResultadoKpi, DetalleResultadoKpi])
       repos.set(t, { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), existsBy: jest.fn().mockResolvedValue(true), delete: jest.fn(), create: (x: any) => x, save: jest.fn(async x => x) });
     repos.get(Usuario).findOne.mockResolvedValue({ idUsuario: 1, idEmpleado: 10, rol: { isActive: true, nivelJerarquico: 2 } });
     repos.get(MetricaKpi).find.mockResolvedValue(Object.entries(VENTAS).map(([codigoKpi,p],i) => ({ idMetrica:i+1, codigoKpi, pesoPorcentaje: String(p), idDepartamento: 2 })));
     repos.get(Empleado).find.mockResolvedValue([{idEmpleado:21,idJefeDirecto:10,codigoSapEmpleado:5,primerNombre:'Ana',primerApellido:'Perez'}]);
     db = { manager: { getRepository: (t: any) => repos.get(t) }, getRepository: (t: any) => repos.get(t), transaction: (fn: any) => fn(db.manager) };
+    db.createQueryRunner = () => ({ connect: jest.fn(), release: jest.fn(), query: jest.fn().mockResolvedValue([{ adquirido: 1 }]) });
+    repos.get(KpiVentasRegla).find.mockResolvedValue([
+      {idMetrica:4,version:1,configuracion:{tipo:'UMBRAL_MAXIMO',umbral:'0.45',cumplimientoHastaUmbral:'100',cumplimientoSobreUmbral:'0'}},
+      {idMetrica:5,version:1,configuracion:{tipo:'PROPORCIONAL',base:'100',cumplimientoMaximo:'100'}}
+    ]);
     sap = { obtenerKpiVentas: jest.fn().mockResolvedValue([]) };
     service = new VentasService(db, sap, { get: () => 'America/Guatemala' } as any);
   });
@@ -124,4 +131,67 @@ describe('Ventas acceso y escritura', () => {
     repos.get(MetricaKpi).find.mockResolvedValue(Object.entries(VENTAS).map(([codigoKpi,p],i) => ({idMetrica:i+1,codigoKpi,pesoPorcentaje:String(p),idDepartamento:3})));
     await expect(service.contexto(1)).rejects.toThrow('CONFIGURACION_VENTAS_INCOMPLETA');
   });
+  function configurarCarga() {
+    repos.get(KpiVentasRegla).find.mockResolvedValue([]);
+    repos.get(Usuario).findOne.mockResolvedValue({idUsuario:1,rol:{isActive:true,nivelJerarquico:3}});
+    sap.obtenerKpiVentas.mockResolvedValue([{slpCode:5,facturacionPeriodoConIVA:'10000',notasCreditoPeriodoConIVA:'45',ventasNetasAcumuladasConIVA:'10000',carteraDeudora:'1000',carteraMenor60:'800'}]);
+    repos.get(MetaKpiEmpleado).find.mockResolvedValue([{idEmpleado:21,periodoMes:1,metaObjetivo:'20000'}]);
+  }
+  it('guarda avance incompleto y reemplaza corte/mes sin duplicarlos ni fabricar nota', async () => {
+    configurarCarga();
+    const meses = new Map(), cortes = new Map();
+    repos.get(KpiVentasAvance).findOne.mockImplementation(async ({where}) => meses.get(where.idEmpleado) ?? null);
+    repos.get(KpiVentasAvance).save.mockImplementation(async x => {meses.set(x.idEmpleado,x); return x;});
+    repos.get(KpiVentasCorte).save.mockImplementation(async x => {cortes.set(x.idEmpleado+':'+x.fechaCorte,x); return x;});
+    await service.actualizar(1,'2026-01-15');
+    await service.actualizar(1,'2026-01-15');
+    expect(meses.size).toBe(1); expect(cortes.size).toBe(1);
+    expect(meses.get(21).datos.notaFinal).toBeNull();
+    expect(meses.get(21).datos.resultados[0].valorObtenido).toBe('9955.000000');
+    expect(repos.get(EvaluacionDesempeno).save).not.toHaveBeenCalled();
+    expect(sap.obtenerKpiVentas).toHaveBeenCalledTimes(2);
+  });
+  it('reprocesar un corte anterior no retrocede el avance mensual', async () => {
+    configurarCarga();
+    repos.get(KpiVentasAvance).findOne.mockResolvedValue({fechaCorte:'2026-01-20'});
+    await service.actualizar(1,'2026-01-15');
+    expect(repos.get(KpiVentasCorte).save).toHaveBeenCalled();
+    expect(repos.get(KpiVentasAvance).save).not.toHaveBeenCalled();
+  });
+  it('preserva datos anteriores si SAP falla y libera bloqueo', async () => {
+    configurarCarga(); const runner={connect:jest.fn(),release:jest.fn(),query:jest.fn().mockResolvedValue([{adquirido:1}])};
+    db.createQueryRunner=()=>runner;
+    sap.obtenerKpiVentas.mockRejectedValue(new Error('SAP fallo'));
+    await expect(service.actualizar(1,'2026-01-15')).rejects.toThrow('SAP fallo');
+    expect(repos.get(KpiVentasAvance).save).not.toHaveBeenCalled();
+    expect(runner.query).toHaveBeenLastCalledWith(expect.stringContaining('RELEASE_LOCK'));
+    expect(runner.release).toHaveBeenCalled();
+  });
+  it('rechaza ejecucion concurrente sin consultar SAP', async () => {
+    configurarCarga();db.createQueryRunner=()=>({connect:jest.fn(),release:jest.fn(),query:jest.fn().mockResolvedValue([{adquirido:0}])});
+    await expect(service.actualizar(1,'2026-01-15')).rejects.toThrow('ACTUALIZACION_VENTAS_EN_CURSO');
+    expect(sap.obtenerKpiVentas).not.toHaveBeenCalled();
+  });
+  it('reporta conflictos SAP sin sustituir avances anteriores', async () => {
+    configurarCarga();repos.get(Empleado).find.mockResolvedValue([{idEmpleado:21,codigoSapEmpleado:5},{idEmpleado:22,codigoSapEmpleado:5}]);
+    const r=await service.actualizar(1,'2026-01-15');
+    expect(r.errores).toHaveLength(2);expect(r.actualizados).toBe(0);
+    expect(repos.get(KpiVentasAvance).save).not.toHaveBeenCalled();
+  });
+  it('omite periodos cerrados sin escribir cortes', async () => {
+    configurarCarga();repos.get(EvaluacionDesempeno).find.mockResolvedValue([{estado:'CERRADA'}]);
+    expect((await service.actualizar(1,'2026-01-15')).cerrados).toBe(1);
+    expect(repos.get(KpiVentasCorte).save).not.toHaveBeenCalled();
+  });
+  it('encargado no puede iniciar carga global', async () => {
+    await expect(service.actualizar(1,'2026-01-15')).rejects.toThrow('Solo RRHH');
+  });
+  it('lee avance propio guardado sin SAP y rechaza otro empleado', async () => {
+    repos.get(Usuario).findOne.mockResolvedValue({idUsuario:1,idEmpleado:21,rol:{isActive:true,nivelJerarquico:1}});
+    repos.get(KpiVentasAvance).find.mockResolvedValue([{idEmpleado:21,fechaCorte:'2026-01-15',datos:{estado:'INCOMPLETA',notaFinal:null,resultados:[]}}]);
+    expect((await service.avance(1,2026,1)).empleados[0].fechaCorte).toBe('2026-01-15');
+    await expect(service.avance(1,2026,1,false,22)).rejects.toThrow();
+    expect(sap.obtenerKpiVentas).not.toHaveBeenCalled();
+  });
+
 });

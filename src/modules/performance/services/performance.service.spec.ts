@@ -14,7 +14,7 @@ describe('ETL de artículos con desglose', () => {
     const metricas = { find: jest.fn().mockResolvedValue([
       { idMetrica: 3, idDepartamento: 3, codigoKpi: 'BOD_ARTICULOS' },
     ]) };
-    const empleados = { findOne: jest.fn().mockResolvedValue({ idEmpleado: 22 }) };
+    const empleados = { find: jest.fn().mockResolvedValue([{ idEmpleado: 22 }]) };
     const registro = { idRegistro: 10, valor: '1', desgloseOrigen: null };
     const diarias = { findOne: jest.fn().mockResolvedValue(registro), save: jest.fn() };
     const service = new PerformanceService(
@@ -24,7 +24,7 @@ describe('ETL de artículos con desglose', () => {
       empleados as unknown as Repository<Empleado>,
     );
     await service.procesarMetricasBodega('2026-08-01');
-    expect(empleados.findOne).toHaveBeenCalledWith({ where: { codigoSapEmpleado: 22, isActive: true, puesto: { idDepartamento: 3 } } });
+    expect(empleados.find).toHaveBeenCalledWith({ take: 2, where: { codigoSapEmpleado: 22, isActive: true, puesto: { idDepartamento: 3 } } });
     expect(diarias.save).toHaveBeenCalledWith(expect.objectContaining({
       idRegistro: 10, valor: '122339.2', fuente: 'SAP', desgloseOrigen: [
         { origen: 'FACTURAS', valor: '37788.25' },
@@ -43,4 +43,16 @@ describe('ETL de artículos con desglose', () => {
       ],
     }));
   });
+  it('rechaza dos empleados activos de Bodega con el mismo codigo SAP', async () => {
+    const diarias={save:jest.fn(),findOne:jest.fn()};
+    const service=new PerformanceService(
+      {obtenerMetricasBodega:jest.fn().mockResolvedValue([{CodigoEmpleadoSap:'22'}])} as any,
+      {find:jest.fn().mockResolvedValue([{idMetrica:3,idDepartamento:3,codigoKpi:'BOD_ARTICULOS'}])} as any,
+      diarias as any,
+      {find:jest.fn().mockResolvedValue([{idEmpleado:22},{idEmpleado:23}])} as any,
+    );
+    await expect(service.procesarMetricasBodega('2026-08-01')).rejects.toThrow();
+    expect(diarias.save).not.toHaveBeenCalled();
+  });
+
 });

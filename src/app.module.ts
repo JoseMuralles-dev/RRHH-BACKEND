@@ -1,3 +1,4 @@
+import { UsoModule } from './modules/uso/uso.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -35,6 +36,7 @@ import {NotificacionesModule,} from './modules/notificaciones/notificaciones.mod
          
       }),
     }),
+    UsoModule,
     AuthModule,
     RolesModule,
     EmpleadosModule,
