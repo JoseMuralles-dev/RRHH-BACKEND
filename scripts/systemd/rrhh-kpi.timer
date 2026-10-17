@@ -1,0 +1,10 @@
+[Unit]
+Description=Actualizar KPI diariamente a la 01:00 de Guatemala
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 America/Guatemala
+Persistent=true
+Unit=rrhh-kpi.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Informes y notificaciones informativas de KPI con IA
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=rrhh
+Group=rrhh
+WorkingDirectory=/var/www/rrhh-backend
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /var/www/rrhh-backend/dist/generar-informes-ia.js
+TimeoutStartSec=1h
+UMask=0077

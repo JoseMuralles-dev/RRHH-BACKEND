@@ -1,0 +1,14 @@
+[Unit]
+Description=Guardar cortes diarios y avance mensual KPI Ventas
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=rrhh
+Group=rrhh
+WorkingDirectory=/var/www/rrhh-backend
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /var/www/rrhh-backend/dist/actualizar-kpi-ventas.js
+TimeoutStartSec=2h
+UMask=0077

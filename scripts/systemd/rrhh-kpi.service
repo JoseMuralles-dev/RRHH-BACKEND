@@ -1,0 +1,14 @@
+[Unit]
+Description=Carga SAP y recalculo mensual de KPI Bodega
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=rrhh
+Group=rrhh
+WorkingDirectory=/var/www/rrhh-backend
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /var/www/rrhh-backend/dist/actualizar-kpi.js
+TimeoutStartSec=2h
+UMask=0077

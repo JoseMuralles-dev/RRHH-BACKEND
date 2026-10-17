@@ -1,0 +1,10 @@
+[Unit]
+Description=Actualizar KPI Ventas diariamente a la 01:30 Guatemala
+
+[Timer]
+OnCalendar=*-*-* 01:30:00 America/Guatemala
+Persistent=true
+Unit=rrhh-kpi-ventas.service
+
+[Install]
+WantedBy=timers.target
