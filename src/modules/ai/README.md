@@ -1,6 +1,6 @@
 # Tools analiticas de KPI
 
-Primera iteracion: cinco endpoints de lectura. No se invoca n8n ni un modelo, no se guardan analisis/alertas y no se modifica la nota oficial. No hay migraciones; synchronize permanece en false.
+Este documento describe las cinco herramientas de lectura. Para la pantalla Angular, consultas a n8n, historial y notificaciones programadas, consulta [INTEGRACION-IA.md](./INTEGRACION-IA.md), incluida la nueva migracion de informes. Las tools no modifican la nota oficial; synchronize permanece en false.
 
 ## Estructura y reutilizacion
 
@@ -64,7 +64,7 @@ No existe tool global sin filtros. El encargado no consulta su propio detalle en
 
 JwtAuthGuard valida el JWT; RolesGuard valida el nivel y AiContextService valida el alcance mediante jefeDirecto.idEmpleado. Los campos extra de identidad o rol en body se rechazan. La IA nunca decide permisos.
 
-En el futuro flujo n8n, mantener el JWT del usuario iniciador en contexto confiable de esa ejecucion y enviarlo como Bearer fijo en cada HTTP Request Tool. No exponerlo al modelo ni permitirle elegir credenciales/editar el header. No utilizar un token RRHH/Admin compartido para atender a empleados. La comunicacion NestJS -> webhook n8n queda para AiService en otra iteracion; no se implementa en estas tools.
+El flujo actual usa autenticacion interna: X-Internal-Token y X-Actor-Id fijado desde el contexto confiable recibido del backend. No almacenar ni reenviar el JWT del usuario en n8n. La comunicacion NestJS -> webhook se implementa en AiService. Consulta la seccion de autenticacion interna y la guia INTEGRACION-IA.md.
 
 El agente debe empezar por resumen, profundizar en empleado y despues en una serie. Los historicos comparan meses sin cargar todos los dias. No conectar el GET legado como contexto automatico. No hay SQL generico ni credenciales MySQL en n8n. Las respuestas nuevas no incluyen nombres, DPI, telefono, direccion ni expedientes.
 

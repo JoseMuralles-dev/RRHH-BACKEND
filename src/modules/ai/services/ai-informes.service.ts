@@ -49,9 +49,12 @@ export class AiInformesService {
     const key = 'rrhh:ia:' + idUsuario;
     let locked = false;
     try {
-      const rows: Array<{ adquirido: number | null }> = await runner.query('SELECT GET_LOCK(?, 0) AS adquirido', [key]);
-      if (rows[0]?.adquirido === 0) throw new ConflictException('Ya hay un análisis en curso. Espera a que termine.');
-      if (rows[0]?.adquirido !== 1) throw new ServiceUnavailableException('No fue posible iniciar el análisis.');
+      const rows: Array<{ adquirido: number | string | null }> = await runner.query('SELECT GET_LOCK(?, 0) AS adquirido', [key]);
+      // mysql2 puede devolver BIGINT como string con bigNumberStrings habilitado.
+      // No convertir null a 0: NULL representa un fallo, no un lock ocupado.
+      const adquirido = rows[0]?.adquirido;
+      if (adquirido === 0 || adquirido === '0') throw new ConflictException('Ya hay un análisis en curso. Espera a que termine.');
+      if (adquirido !== 1 && adquirido !== '1') throw new ServiceUnavailableException('No fue posible iniciar el análisis.');
       locked = true;
       return await action(runner.manager);
     } finally {
