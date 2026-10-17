@@ -22,7 +22,8 @@ export function calcularVentas(sap: VentasSap, mes: number, metas: MetaKpiEmplea
   const resultados = Object.entries(VENTAS).map(([codigo, peso]) => {
     const metrica = metricas.find(m => m.codigoKpi === codigo)!;
     const meta = codigo === 'VEN_META_MENSUAL' ? mensual : codigo === 'VEN_META_ACUMULADA' ? acumulada :
-      codigo === 'VEN_NUEVOS_CLIENTES' ? metrica.metaObjetivo ?? '4' : codigo === 'VEN_NOTAS_CREDITO' ? String(configuradas?.find(r => r.idMetrica === metrica.idMetrica)?.configuracion.umbral ?? '0.45') : null;
+      codigo === 'VEN_NUEVOS_CLIENTES' ? metrica.metaObjetivo ?? '4' : codigo === 'VEN_NOTAS_CREDITO' ? String(configuradas?.find(r => r.idMetrica === metrica.idMetrica)?.configuracion.umbral ?? '0.45') :
+      codigo === 'VEN_CARTERA_SANA' ? (configuradas?.find(r => r.idMetrica === metrica.idMetrica)?.configuracion.base != null ? String(configuradas.find(r => r.idMetrica === metrica.idMetrica)!.configuracion.base) : null) : null;
     const valor = valores[codigo];
     let estado = 'OK', cumplimiento: bigint | null = null, puntos: bigint | null = null;
     const reglas = rangos.filter(r => r.idMetrica === metrica.idMetrica && r.isActive);

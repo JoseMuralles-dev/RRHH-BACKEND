@@ -68,6 +68,7 @@ describe('Calculo Ventas', () => {
     const r=calcularVentas(sap,2,metas,dec(4),metricas,[],configuradas);
     expect(r.resultados[4].porcentajeCumplimiento).toBe('80.0000');
     expect(r.resultados[4].puntos).toBe('28.0000');
+    expect(r.resultados[4].metaAplicada).toBe('100');
     expect(r.resultados[4].reglaAplicada).toEqual(expect.objectContaining({version:2,configuracion:configuradas[1].configuracion}));
   });
   it('cartera limita su aporte a 35 y sin cartera deja pendiente',()=>{
