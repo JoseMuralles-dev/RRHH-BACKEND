@@ -15,17 +15,23 @@ import { MetricaKpi } from '../performance/entities/metrica-kpi.entity';
 import { MetricaKpiDiaria } from '../performance/entities/metrica-kpi-diaria.entity';
 import { AiController } from './controllers/ai.controller';
 import { AiService } from './services/ai.service';
+import { AiInforme } from './entities/ai-informe.entity';
+import { AiActorService } from './services/ai-actor.service';
+import { AiInformesService } from './services/ai-informes.service';
+import { AiAutomaticoService } from './services/ai-automatico.service';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 
 @Module({
   imports: [
     AuthModule,
     ConfigModule,
-    TypeOrmModule.forFeature([Usuario, Empleado, MetricaKpi, MetricaKpiDiaria]),
+    NotificacionesModule,
+    TypeOrmModule.forFeature([Usuario, Empleado, MetricaKpi, MetricaKpiDiaria, AiInforme]),
   ],
 
   controllers: [AiToolsController, AiToolsLegacyController, AiController],
 
-  providers: [AiToolsAuthGuard, AiToolsService, AiContextService, AiService],
+  providers: [AiToolsAuthGuard, AiToolsService, AiContextService, AiService, AiActorService, AiInformesService, AiAutomaticoService],
 
   exports: [AiToolsService],
 })
