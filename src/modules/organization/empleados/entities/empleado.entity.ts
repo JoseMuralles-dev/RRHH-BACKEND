@@ -20,20 +20,15 @@ export class Empleado {
     name: 'id_empleado',
   })
   idEmpleado!: number;
-
-
   // =========================================================
   // RELACIÓN CON SAP
   // =========================================================
-
   @Column({
     name: 'codigo_sap_empleado',
     nullable: true,
     type: 'int'
   })
   codigoSapEmpleado?: number | null;
-
-
   // =========================================================
   // FOREIGN KEYS
   // =========================================================

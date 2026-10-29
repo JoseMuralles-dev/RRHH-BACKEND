@@ -131,7 +131,10 @@ describe('AiContextService: alcance y periodos', () => {
       });
       await expect(
         context.autorizarEmpleado(usuario(nivel, null), 21),
-      ).resolves.toEqual({ idEmpleado: 21, idDepartamento: 3 });
+      ).resolves.toEqual({
+        idEmpleado: 21,
+        idDepartamento: 3,
+      });
       expect(empleados.findOne).toHaveBeenCalledTimes(1);
     },
   );

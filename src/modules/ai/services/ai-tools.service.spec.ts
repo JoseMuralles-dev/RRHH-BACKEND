@@ -324,4 +324,40 @@ describe('Tools analiticas', () => {
       expect(() => numeroAnalitico(valor)).toThrow();
     },
   );
+  it('no envía nombres ni datos personales en las cinco herramientas', async () => {
+    const empleado = {
+      idEmpleado: 21,
+      primerNombre: ' Ana ',
+      segundoNombre: null,
+      primerApellido: 'López',
+      segundoApellido: '',
+      puesto: { idDepartamento: 3 },
+      dpi: 'PRIVADO',
+    };
+    empleados.findOne.mockResolvedValue(empleado);
+    empleados.find.mockResolvedValue([empleado]);
+    qb.getRawMany.mockResolvedValue([]);
+    const dto = {
+      idEmpleado: 21,
+      idEncargado: 10,
+      anio: 2026,
+      mes: 7,
+      cantidadMeses: 2,
+      codigoKpi: 'BOD_FACTURAS',
+    };
+    const respuestas = [
+      (await service.obtenerResumenEquipo(dto, rrhh)).empleados[0],
+      await service.obtenerMetricasEmpleado(dto, rrhh),
+      await service.obtenerSerieMetricaEmpleado(dto, rrhh),
+      (await service.obtenerHistoricoEquipo(dto, rrhh)).empleados[0],
+      await service.obtenerHistoricoEmpleado(dto, rrhh),
+    ];
+    for (const respuesta of respuestas) {
+      expect(respuesta).toMatchObject({
+        idEmpleado: 21,
+      });
+      expect(respuesta).not.toHaveProperty('dpi');
+      expect(respuesta).not.toHaveProperty('nombreCompleto');
+    }
+  });
 });

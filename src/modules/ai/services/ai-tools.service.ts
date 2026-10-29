@@ -1,4 +1,4 @@
-﻿import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Repository } from 'typeorm';
@@ -361,10 +361,6 @@ export class AiToolsService {
     const subordinados = await this.empleadoRepository.find({
       select: {
         idEmpleado: true,
-        primerNombre: true,
-        segundoNombre: true,
-        primerApellido: true,
-        segundoApellido: true,
       },
       where: {
         jefeDirecto: {
@@ -472,15 +468,6 @@ export class AiToolsService {
       return {
         empleado: {
           idEmpleado: empleado.idEmpleado,
-
-          nombre: [
-            empleado.primerNombre,
-            empleado.segundoNombre,
-            empleado.primerApellido,
-            empleado.segundoApellido,
-          ]
-            .filter(Boolean)
-            .join(' '),
         },
 
         metricas: Array.from(metricasEmpleado.values()),

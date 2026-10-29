@@ -9,7 +9,6 @@ import {
 } from 'typeorm';
 
 import { Empleado } from '../../organization/empleados/entities/empleado.entity';
-// Ajusta esta ruta según tu estructura real.
 
 @Entity('evaluaciones_desempeno')
 export class EvaluacionDesempeno {
