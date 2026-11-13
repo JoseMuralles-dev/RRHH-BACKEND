@@ -38,7 +38,7 @@ async function verificar() {
   assert.equal(deduplicacion.length, '64');
   assert.equal(deduplicacion.isNullable, true);
   assert.ok(informe.indices.some(index => index.isUnique && index.columns.includes(deduplicacion)) ||
-    informe.uniques.some(unique => unique.columns.includes(deduplicacion)), 'Deduplicacion debe ser unica');
+  informe.uniques.some(unique => unique.columns.includes(deduplicacion)), 'Deduplicacion debe ser unica');
   const empleados = source.getRepository(Empleado);
   const metricas = source.getRepository(MetricaKpi);
   const diarias = source.getRepository(MetricaKpiDiaria);
